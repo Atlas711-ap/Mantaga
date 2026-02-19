@@ -20,6 +20,44 @@ Each agent maintains:
 
 ---
 
+## Model Assignments
+
+See [MODEL-ASSIGNMENTS.md](./MODEL-ASSIGNMENTS.md) for detailed configuration.
+
+| Agent | Model | Why |
+|-------|-------|-----|
+| **Athena** | MiniMax M2.5 Highspeed | Strategic decisions require strong reasoning |
+| **Nexus** | Ollama Local 32B | Data processing is deterministic |
+| **Atlas** | Ollama Local 32B | Validation is rule-based |
+| **Forge** | Ollama Local 32B | Code generation is what 32B coder does |
+
+---
+
+## Tool-First Architecture
+
+### Core Principle
+Junior agents (Nexus, Atlas, Forge) don't "think" - they **EXECUTE TOOLS**.
+
+### How It Works
+
+**Phase 1:** Forge builds foundational tools (see `~/Mantaga/tools/README.md`)
+
+**Phase 2:** Junior agents just RUN the tools:
+- Nexus: `python velocity_calculator.py input.csv` → reports results
+- Atlas: `python sku_validator.py input.csv master.csv` → reports pass/fail
+
+### Wrong vs Right
+
+**WRONG:**
+> Nexus: "SKU-003 velocity dropped 40%. This is concerning because it might indicate supply chain issues..."
+
+**RIGHT:**
+> Nexus: "SKU-003 velocity: 45 → 27 units/day (-40%). Forecast: OOS in 4 days. @Athena"
+
+Nexus reports FACTS. Athena interprets MEANING.
+
+---
+
 ## Communication Protocols
 
 - Mission Control is source of truth
