@@ -142,17 +142,23 @@ export default function DataUploadPage() {
             let updated = 0;
             let skipped = 0;
 
-            // Filter for darkstores and 3PL warehouses only
-            const validWarehouses = data.filter((row: any) => {
-              const warehouse = row.warehouse_name?.toLowerCase() || row.warehouse?.toLowerCase() || "";
-              return warehouse.includes("darkstore") || warehouse.includes("3pl") || warehouse.includes("ds_") || warehouse.includes("talabat");
+            // Process all rows - be more flexible with column names
+            const allRows = data.filter((row: any) => {
+              // Check if row has any identifying data
+              const barcode = row.barcode || row.Barcode || row.sku_barcode || row.product_barcode || row["SKU Barcode"] || "";
+              return barcode && barcode.length > 0;
             });
 
+            // For now, process all rows without filtering
+            const validWarehouses = allRows;
+
             for (const row of validWarehouses) {
-              const barcode = row.barcode || row.sku_barcode || row.product_barcode || "";
-              const warehouseName = row.warehouse_name || row.warehouse || "";
-              const stockOnHand = parseInt(row.stock_on_hand || row.stock || row.qty || "0");
-              const putawayReserved = parseInt(row.putaway_reserved || row.reserved || "0");
+              // Flexible column name matching
+              const barcode = row.barcode || row.Barcode || row.sku_barcode || row.product_barcode || row["SKU Barcode"] || "";
+              const warehouseName = row.warehouse_name || row.Warehouse || row.warehouse || row.WarehouseName || row.location || "";
+              const productName = row.product_name || row.Product || row.sku_name || row.name || row["Product Name"] || "Unknown";
+              const stockOnHand = parseInt(row.stock_on_hand || row.Stock || row.stock || row.qty || row.Quantity || row["Stock on Hand"] || "0");
+              const putawayReserved = parseInt(row.putaway_reserved || row.reserved || row.Reserved || row["Reserved Qty"] || "0");
               const effectiveStock = stockOnHand - putawayReserved;
               const warehouseType = warehouseName.toLowerCase().includes("3pl") ? "3PL" : "Darkstore";
 
