@@ -53,6 +53,9 @@ export default function DataUploadPage() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  
+  // Date picker for daily stock report
+  const [stockReportDate, setStockReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Convex mutations
   const insertStockSnapshot = useInsertDailyStockSnapshot();
@@ -124,7 +127,7 @@ export default function DataUploadPage() {
   };
 
   // Process Daily Stock CSV
-  const processDailyStock = async (file: File): Promise<{ success: boolean; message: string; recordsProcessed: number }> => {
+  const processDailyStock = async (file: File, reportDate: string): Promise<{ success: boolean; message: string; recordsProcessed: number }> => {
     return new Promise((resolve) => {
       Papa.parse(file, {
         header: true,
@@ -134,7 +137,6 @@ export default function DataUploadPage() {
             const data = results.data as any[];
             let inserted = 0;
             let skipped = 0;
-            const today = new Date().toISOString().split('T')[0];
 
             // Filter for darkstores and 3PL warehouses only
             const validWarehouses = data.filter((row: any) => {
@@ -153,7 +155,7 @@ export default function DataUploadPage() {
               if (barcode && warehouseName) {
                 try {
                   await insertStockSnapshot({
-                    report_date: today,
+                    report_date: reportDate,
                     sku_id: "",
                     barcode,
                     product_name: row.product_name || row.sku_name || row.name || "Unknown",
@@ -187,7 +189,7 @@ export default function DataUploadPage() {
 
             resolve({
               success: true,
-              message: `📊 STOCK REPORT PROCESSED — ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+              message: `📊 STOCK REPORT PROCESSED — ${new Date(reportDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
 
 ────────────────────────────────────────
 SKUs tracked: ${inserted}
@@ -543,10 +545,10 @@ Data available in Brand Performance tab.`,
       let processedResult: { success: boolean; message: string };
 
       if (selectedType === "daily_stock") {
-        // Read file and process CSV
+        // Read file and process CSV with selected date
         const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
         if (fileInput?.files?.[0]) {
-          processedResult = await processDailyStock(fileInput.files[0]);
+          processedResult = await processDailyStock(fileInput.files[0], stockReportDate);
         } else {
           processedResult = { success: false, message: "No file selected" };
         }
@@ -640,6 +642,24 @@ Data available in Brand Performance tab.`,
               className="hidden"
             />
           </div>
+
+          {/* Date Picker for Daily Stock */}
+          {selectedType === "daily_stock" && (
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+              <label className="block text-xs font-medium text-slate-400 mb-2">
+                📊 Report Date (for all rows in this CSV)
+              </label>
+              <input
+                type="date"
+                value={stockReportDate}
+                onChange={(e) => setStockReportDate(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                This date will be used as the report_date for every row written to the database.
+              </p>
+            </div>
+          )}
 
           {/* Selected Files */}
           {files.length > 0 && (
