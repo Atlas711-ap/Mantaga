@@ -272,10 +272,10 @@ export default function DataUploadPage() {
             client: row.Client || row.client || "Quadrant International",
             brand: row.Brand || row.brand || "Mudhish",
             barcode: row.Barcode || row.barcode || "",
-            sku_name: row["SKU Name"] || row["SKU Name"] || row.sku_name || row.name || "",
+            sku_name: row["SKU Name"] || row.sku_name || row.name || "",
             category: row.Category || row.category || undefined,
             subcategory: row.Subcategory || row.subcategory || undefined,
-            case_pack: row["Case Pack"] || row["Case Pack"] || row.case_pack ? parseInt(row["Case Pack"] || row.case_pack) : undefined,
+            case_pack: row["Case Pack"] || row.case_pack ? parseInt(String(row["Case Pack"] || row.case_pack || "0")) : undefined,
             shelf_life: row["Shelf life"] || row["Shelf Life"] || row.shelf_life || undefined,
             nutrition_info: row["Nutrition Info"] || row.nutrition_info || undefined,
             ingredients_info: row["Ingredients Info"] || row.ingredients_info || undefined,
@@ -283,7 +283,11 @@ export default function DataUploadPage() {
             talabat_sku: row["Talabat SKU"] || row.talabat_sku || undefined,
             noon_zsku: row["Noon ZSKU"] || row.noon_zsku || undefined,
             careem_code: row["Careem Code"] || row.careem_code || undefined,
-            client_sellin_price: row["Client Sell-in Price (AED)"] || row["Client Sell-in Price (AED)"] ? parseFloat(String(row["Client Sell-in Price (AED)"] || "0")) : undefined,
+            // PTT = Price to Trade (platform-specific sell prices)
+            amazon_ptt: row["Amazon PTT"] || row.amazon_ptt ? parseFloat(String(row["Amazon PTT"] || row.amazon_ptt || "0")) : undefined,
+            talabat_ptt: row["Talabat PTT"] || row.talabat_ptt ? parseFloat(String(row["Talabat PTT"] || row.talabat_ptt || "0")) : undefined,
+            noon_ptt: row["Noon PTT"] || row.noon_ptt ? parseFloat(String(row["Noon PTT"] || row.noon_ptt || "0")) : undefined,
+            careem_ptt: row["Careem PTT"] || row.careem_ptt ? parseFloat(String(row["Careem PTT"] || row.careem_ptt || "0")) : undefined,
             mantaga_commission_pct: row["Commission %"] || row["Mantaga Commission %"] || row.mantaga_commission_pct ? parseFloat(String(row["Commission %"] || row["Mantaga Commission %"] || "0")) : undefined,
           })).filter(sku => sku.barcode && sku.sku_name);
 

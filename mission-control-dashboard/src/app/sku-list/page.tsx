@@ -143,7 +143,10 @@ export default function SkuListPage() {
           talabat_sku: formData.talabat_sku,
           noon_zsku: formData.noon_zsku,
           careem_code: formData.careem_code,
-          client_sellin_price: formData.client_sellin_price,
+          amazon_ptt: (formData as any).amazon_ptt,
+          talabat_ptt: (formData as any).talabat_ptt,
+          noon_ptt: (formData as any).noon_ptt,
+          careem_ptt: (formData as any).careem_ptt,
           mantaga_commission_pct: formData.mantaga_commission_pct,
         });
       }

@@ -17,7 +17,11 @@ export default defineSchema({
     talabat_sku: v.optional(v.string()),
     noon_zsku: v.optional(v.string()),
     careem_code: v.optional(v.string()),
-    client_sellin_price: v.optional(v.number()),
+    // PTT = Price to Trade (platform-specific sell prices)
+    amazon_ptt: v.optional(v.number()),
+    talabat_ptt: v.optional(v.number()),
+    noon_ptt: v.optional(v.number()),
+    careem_ptt: v.optional(v.number()),
     mantaga_commission_pct: v.optional(v.number()),
   }).index("by_barcode", ["barcode"]).index("by_brand", ["brand"]),
 

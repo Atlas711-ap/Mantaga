@@ -19,7 +19,10 @@ export const insertMasterSku = mutation({
     talabat_sku: v.optional(v.string()),
     noon_zsku: v.optional(v.string()),
     careem_code: v.optional(v.string()),
-    client_sellin_price: v.optional(v.number()),
+    amazon_ptt: v.optional(v.number()),
+    talabat_ptt: v.optional(v.number()),
+    noon_ptt: v.optional(v.number()),
+    careem_ptt: v.optional(v.number()),
     mantaga_commission_pct: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -44,7 +47,10 @@ export const updateMasterSkuById = mutation({
     talabat_sku: v.optional(v.string()),
     noon_zsku: v.optional(v.string()),
     careem_code: v.optional(v.string()),
-    client_sellin_price: v.optional(v.number()),
+    amazon_ptt: v.optional(v.number()),
+    talabat_ptt: v.optional(v.number()),
+    noon_ptt: v.optional(v.number()),
+    careem_ptt: v.optional(v.number()),
     mantaga_commission_pct: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -70,7 +76,10 @@ export const bulkUpsertMasterSku = mutation({
       talabat_sku: v.optional(v.string()),
       noon_zsku: v.optional(v.string()),
       careem_code: v.optional(v.string()),
-      client_sellin_price: v.optional(v.number()),
+      amazon_ptt: v.optional(v.number()),
+      talabat_ptt: v.optional(v.number()),
+      noon_ptt: v.optional(v.number()),
+      careem_ptt: v.optional(v.number()),
       mantaga_commission_pct: v.optional(v.number()),
     })),
   },
@@ -100,7 +109,11 @@ export const bulkUpsertMasterSku = mutation({
         if (!existing.talabat_sku && sku.talabat_sku) updates.talabat_sku = sku.talabat_sku;
         if (!existing.noon_zsku && sku.noon_zsku) updates.noon_zsku = sku.noon_zsku;
         if (!existing.careem_code && sku.careem_code) updates.careem_code = sku.careem_code;
-        if (!existing.client_sellin_price && sku.client_sellin_price) updates.client_sellin_price = sku.client_sellin_price;
+        if (!existing.amazon_ptt && sku.amazon_ptt) updates.amazon_ptt = sku.amazon_ptt;
+        if (!existing.talabat_ptt && sku.talabat_ptt) updates.talabat_ptt = sku.talabat_ptt;
+        if (!existing.noon_ptt && sku.noon_ptt) updates.noon_ptt = sku.noon_ptt;
+        if (!existing.careem_ptt && sku.careem_ptt) updates.careem_ptt = sku.careem_ptt;
+        if (!existing.mantaga_commission_pct && sku.mantaga_commission_pct) updates.mantaga_commission_pct = sku.mantaga_commission_pct;
         
         if (Object.keys(updates).length > 0) {
           await ctx.db.patch(existing._id, updates);
