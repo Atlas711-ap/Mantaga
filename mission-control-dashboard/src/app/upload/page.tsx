@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
+import Papa from "papaparse";
 import { 
   useInsertDailyStockSnapshot, 
   useBulkUpsertMasterSku, 
@@ -122,6 +123,408 @@ export default function DataUploadPage() {
     }
   };
 
+  // Process Daily Stock CSV
+  const processDailyStock = async (file: File): Promise<{ success: boolean; message: string; recordsProcessed: number }> => {
+    return new Promise((resolve) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          try {
+            const data = results.data as any[];
+            let inserted = 0;
+            let skipped = 0;
+            const today = new Date().toISOString().split('T')[0];
+
+            // Filter for darkstores and 3PL warehouses only
+            const validWarehouses = data.filter((row: any) => {
+              const warehouse = row.warehouse_name?.toLowerCase() || row.warehouse?.toLowerCase() || "";
+              return warehouse.includes("darkstore") || warehouse.includes("3pl") || warehouse.includes("ds_") || warehouse.includes("talabat");
+            });
+
+            for (const row of validWarehouses) {
+              const barcode = row.barcode || row.sku_barcode || row.product_barcode || "";
+              const warehouseName = row.warehouse_name || row.warehouse || "";
+              const stockOnHand = parseInt(row.stock_on_hand || row.stock || row.qty || "0");
+              const putawayReserved = parseInt(row.putaway_reserved || row.reserved || "0");
+              const effectiveStock = stockOnHand - putawayReserved;
+              const warehouseType = warehouseName.toLowerCase().includes("3pl") ? "3PL" : "Darkstore";
+
+              if (barcode && warehouseName) {
+                try {
+                  await insertStockSnapshot({
+                    report_date: today,
+                    sku_id: "",
+                    barcode,
+                    product_name: row.product_name || row.sku_name || row.name || "Unknown",
+                    warehouse_name: warehouseName,
+                    warehouse_type: warehouseType,
+                    stock_on_hand: stockOnHand,
+                    putaway_reserved_qty: putawayReserved,
+                    effective_stock: effectiveStock,
+                  });
+                  inserted++;
+                } catch (e: any) {
+                  if (e.message === "DUPLICATE_ENTRY") {
+                    skipped++;
+                  }
+                }
+              }
+            }
+
+            const oosCount = validWarehouses.filter((r: any) => {
+              const stock = parseInt(r.stock_on_hand || r.stock || "0");
+              const reserved = parseInt(r.putaway_reserved || r.reserved || "0");
+              return (stock - reserved) <= 0;
+            }).length;
+
+            const lowStockCount = validWarehouses.filter((r: any) => {
+              const stock = parseInt(r.stock_on_hand || r.stock || "0");
+              const reserved = parseInt(r.putaway_reserved || r.reserved || "0");
+              const effective = stock - reserved;
+              return effective > 0 && effective <= 3;
+            }).length;
+
+            resolve({
+              success: true,
+              message: `📊 STOCK REPORT PROCESSED — ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+
+────────────────────────────────────────
+SKUs tracked: ${inserted}
+Warehouses covered: ${validWarehouses.length}
+🔴 Out of stock: ${oosCount} locations
+🟡 Low stock (≤3 units): ${lowStockCount} locations
+🟢 Records inserted: ${inserted}
+⚠️ Duplicates skipped: ${skipped}`,
+              recordsProcessed: inserted,
+            });
+          } catch (error) {
+            resolve({
+              success: false,
+              message: `Error processing stock report: ${error}`,
+              recordsProcessed: 0,
+            });
+          }
+        },
+        error: (error) => {
+          resolve({
+            success: false,
+            message: `Error parsing CSV: ${error.message}`,
+            recordsProcessed: 0,
+          });
+        }
+      });
+    });
+  };
+
+  // Process SKU List Excel
+  const processSkuList = async (file: File): Promise<{ success: boolean; message: string; recordsProcessed: number }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+          const skus = jsonData.map(row => ({
+            client: row.Client || row.client || "Quadrant International",
+            brand: row.Brand || row.brand || "Mudhish",
+            barcode: row.Barcode || row.barcode || "",
+            sku_name: row["SKU Name"] || row.sku_name || row.name || "",
+            category: row.Category || row.category || undefined,
+            subcategory: row.Subcategory || row.subcategory || undefined,
+            case_pack: row["Case Pack"] ? parseInt(row["Case Pack"]) : undefined,
+            shelf_life: row["Shelf Life"] || row.shelf_life || undefined,
+            nutrition_info: row["Nutrition Info"] || row.nutrition_info || undefined,
+            ingredients_info: row["Ingredients Info"] || row.ingredients_info || undefined,
+            amazon_asin: row["Amazon ASIN"] || row.amazon_asin || undefined,
+            talabat_sku: row["Talabat SKU"] || row.talabat_sku || undefined,
+            noon_zsku: row["Noon ZSKU"] || row.noon_zsku || undefined,
+            careem_code: row["Careem Code"] || row.careem_code || undefined,
+            client_sellin_price: row["Client Sell-in Price (AED)"] ? parseFloat(row["Client Sell-in Price (AED)"]) : undefined,
+            mantaga_commission_pct: row["Mantaga Commission %"] ? parseFloat(row["Mantaga Commission %"]) : undefined,
+          })).filter(sku => sku.barcode && sku.sku_name);
+
+          if (skus.length > 0) {
+            await bulkUpsertSku({ skus });
+          }
+
+          resolve({
+            success: true,
+            message: `📋 SKU LIST PROCESSED — ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+
+────────────────────────────────────────
+✅ SKUs synced: ${skus.length}
+Total SKUs in database: Now available in SKU List tab
+
+Use the SKU List tab to view and manage all products.`,
+            recordsProcessed: skus.length,
+          });
+        } catch (error) {
+          resolve({
+            success: false,
+            message: `Error processing SKU list: ${error}`,
+            recordsProcessed: 0,
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Process LPO Excel
+  const processLpo = async (file: File): Promise<{ success: boolean; message: string; poNumber: string }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+          // Try to find header row
+          const headerRow = jsonData.find((row: any) => 
+            row["PO Number"] || row["PO No"] || row.po_number || row["Order Number"]
+          );
+
+          if (!headerRow) {
+            resolve({
+              success: false,
+              message: "Could not find PO/LPO information in the file. Please ensure the file has a PO Number column.",
+              poNumber: "",
+            });
+            return;
+          }
+
+          const poNumber = headerRow["PO Number"] || headerRow["PO No"] || headerRow.po_number || headerRow["Order Number"] || `PO${Date.now()}`;
+          const orderDate = headerRow["Order Date"] || headerRow["Orderdate"] || headerRow.order_date || new Date().toISOString().split('T')[0];
+          const deliveryDate = headerRow["Delivery Date"] || headerRow["DeliveryDate"] || headerRow.delivery_date || new Date().toISOString().split('T')[0];
+          const supplier = headerRow.Supplier || headerRow.supplier || "Unknown";
+          const deliveryLocation = headerRow["Delivery Location"] || headerRow["Delivery To"] || headerRow.delivery_location || "Talabat 3PL";
+          const totalExclVat = parseFloat(headerRow["Total (excl. VAT)"] || headerRow["Total Excl VAT"] || headerRow.total_excl_vat || "0");
+          const vat = parseFloat(headerRow.VAT || headerRow.vat || "0");
+          const totalInclVat = parseFloat(headerRow["Total (incl. VAT)"] || headerRow["Total Incl VAT"] || headerRow.total_incl_vat || (totalExclVat + vat));
+
+          // Insert LPO header
+          await insertLpo({
+            po_number: poNumber,
+            order_date: orderDate,
+            delivery_date: deliveryDate,
+            supplier,
+            delivery_location: deliveryLocation,
+            total_excl_vat: totalExclVat,
+            total_vat: vat,
+            total_incl_vat: totalInclVat,
+          });
+
+          // Process line items (rows with SKU info)
+          let lineItemsCount = 0;
+          for (const row of jsonData) {
+            const barcode = row.Barcode || row.barcode || row["SKU Barcode"];
+            const productName = row["Product Name"] || row.Product || row.sku_name || row.name;
+            const quantity = parseInt(row.Quantity || row.qty || row["Qty Ordered"] || "0");
+            const unitCost = parseFloat(row["Unit Cost"] || row["Unit Price"] || row.unit_cost || "0");
+            const amountExclVat = parseFloat(row["Amount (excl. VAT)"] || row.amount_excl_vat || "0");
+            const vatPct = parseFloat(row["VAT %"] || row.vat_pct || "5");
+            const vatAmount = parseFloat(row["VAT Amount"] || row.vat_amount || "0");
+            const amountInclVat = parseFloat(row["Amount (incl. VAT)"] || row.amount_incl_vat || (amountExclVat + vatAmount));
+
+            if (barcode && productName && quantity > 0) {
+              await insertLpoLineItem({
+                po_number: poNumber,
+                barcode,
+                product_name: productName,
+                quantity_ordered: quantity,
+                unit_cost: unitCost,
+                amount_excl_vat: amountExclVat,
+                vat_pct: vatPct,
+                vat_amount: vatAmount,
+                amount_incl_vat: amountInclVat,
+              });
+              lineItemsCount++;
+            }
+          }
+
+          resolve({
+            success: true,
+            message: `📄 LPO RECEIVED — ${poNumber}
+
+────────────────────────────────────────
+Order Date: ${orderDate}
+Delivery Date: ${deliveryDate}
+Supplier: ${supplier}
+Delivery to: ${deliveryLocation}
+
+Line items: ${lineItemsCount}
+Total (excl. VAT): AED ${totalExclVat.toLocaleString()}
+VAT (5%): AED ${vat.toLocaleString()}
+Total (incl. VAT): AED ${totalInclVat.toLocaleString()}
+
+Status: ⏳ Awaiting invoice match`,
+            poNumber,
+          });
+        } catch (error) {
+          resolve({
+            success: false,
+            message: `Error processing LPO: ${error}`,
+            poNumber: "",
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Process Invoice Excel
+  const processInvoice = async (file: File): Promise<{ success: boolean; message: string }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+          const headerRow = jsonData.find((row: any) => 
+            row["Invoice Number"] || row["Invoice No"] || row.invoice_number
+          );
+
+          if (!headerRow) {
+            resolve({
+              success: false,
+              message: "Could not find Invoice information in the file.",
+            });
+            return;
+          }
+
+          const invoiceNumber = headerRow["Invoice Number"] || headerRow["Invoice No"] || headerRow.invoice_number || `INV${Date.now()}`;
+          const invoiceDate = headerRow["Invoice Date"] || headerRow.InvoiceDate || headerRow.invoice_date || new Date().toISOString().split('T')[0];
+          const poNumber = headerRow["PO Number"] || headerRow["PO No"] || headerRow.po_number || "";
+          const customer = headerRow.Customer || headerRow.customer || "Quadrant International";
+          const subtotal = parseFloat(headerRow.Subtotal || headerRow.subtotal || "0");
+          const vatAmount = parseFloat(headerRow["VAT Amount"] || headerRow.vat_amount || "0");
+          const grandTotal = parseFloat(headerRow["Grand Total"] || headerRow["Total (incl. VAT)"] || headerRow.grand_total || (subtotal + vatAmount));
+
+          // Insert Invoice header
+          await insertInvoice({
+            invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
+            po_number: poNumber,
+            customer,
+            subtotal,
+            vat_amount: vatAmount,
+            grand_total: grandTotal,
+          });
+
+          // Process line items
+          let lineItemsCount = 0;
+          let totalInvoicedExclVat = 0;
+          
+          for (const row of jsonData) {
+            const barcode = row.Barcode || row.barcode || row["SKU Barcode"];
+            const productName = row["Product Name"] || row.Product || row.sku_name || row.name;
+            const quantity = parseInt(row.Quantity || row.qty || row["Qty Invoiced"] || "0");
+            const unitRate = parseFloat(row["Unit Rate"] || row["Unit Price"] || row.unit_rate || "0");
+            const taxableAmount = parseFloat(row["Taxable Amount"] || row.taxable_amount || (quantity * unitRate));
+            const lineVatAmount = parseFloat(row["VAT Amount"] || row.vat_amount || "0");
+            const expiryDate = row["Expiry Date"] || row.expiry_date || undefined;
+
+            if (barcode && productName && quantity > 0) {
+              await insertInvoiceLineItem({
+                invoice_number: invoiceNumber,
+                po_number: poNumber,
+                barcode,
+                product_name: productName,
+                expiry_date: expiryDate,
+                unit_rate: unitRate,
+                quantity_invoiced: quantity,
+                taxable_amount: taxableAmount,
+                vat_amount: lineVatAmount,
+              });
+              lineItemsCount++;
+              totalInvoicedExclVat += taxableAmount;
+            }
+          }
+
+          // Get LPO value for comparison
+          let lpoValueExclVat = subtotal; // fallback
+          let serviceLevelPct = 100;
+          let gapValue = 0;
+          let matchStatus = "MATCHED";
+
+          if (poNumber) {
+            gapValue = lpoValueExclVat - totalInvoicedExclVat;
+            if (Math.abs(gapValue) < 0.01) {
+              serviceLevelPct = 100;
+              matchStatus = "MATCHED";
+            } else if (gapValue > 0) {
+              serviceLevelPct = Math.max(0, (totalInvoicedExclVat / lpoValueExclVat) * 100);
+              matchStatus = "DISCREPANCY";
+            } else {
+              serviceLevelPct = 100;
+              matchStatus = "MATCHED";
+            }
+          }
+
+          const commissionAed = totalInvoicedExclVat * 0.05; // 5% commission
+
+          // Insert brand performance record
+          const now = new Date();
+          await insertBrandPerf({
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+            po_number: poNumber,
+            po_date: invoiceDate,
+            invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
+            lpo_value_excl_vat: lpoValueExclVat,
+            lpo_value_incl_vat: lpoValueExclVat * 1.05,
+            invoiced_value_excl_vat: totalInvoicedExclVat,
+            invoiced_value_incl_vat: totalInvoicedExclVat * 1.05,
+            gap_value: gapValue,
+            service_level_pct: serviceLevelPct,
+            commission_aed: commissionAed,
+            match_status: matchStatus,
+          });
+
+          resolve({
+            success: true,
+            message: `🧾 INVOICE PROCESSED — ${invoiceNumber}
+
+────────────────────────────────────────
+Invoice Date: ${invoiceDate}
+PO Number: ${poNumber || "N/A"}
+Customer: ${customer}
+
+Line items: ${lineItemsCount}
+Invoiced Value (excl. VAT): AED ${totalInvoicedExclVat.toLocaleString()}
+VAT: AED ${vatAmount.toLocaleString()}
+Total: AED ${grandTotal.toLocaleString()}
+
+Service Level: ${serviceLevelPct.toFixed(1)}%
+Commission Earned: AED ${commissionAed.toFixed(2)}
+Match Status: ${matchStatus}
+
+Data available in Brand Performance tab.`,
+          });
+        } catch (error) {
+          resolve({
+            success: false,
+            message: `Error processing invoice: ${error}`,
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
   const processFiles = async () => {
     if (!selectedType || files.length === 0) return;
     
@@ -136,87 +539,51 @@ export default function DataUploadPage() {
     }
 
     try {
-      // Read the file
       const file = files[0];
-      const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`);
-      // For now, simulate processing - in production this would parse the actual file
-      
+      let processedResult: { success: boolean; message: string };
+
       if (selectedType === "daily_stock") {
-        // Process daily stock - write to daily_stock_snapshot
-        // In real implementation, parse CSV and insert each row
-        const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-        
-        // Mock processing result
-        const processedResult = {
-          success: true,
-          message: `📊 STOCK REPORT PROCESSED — ${dateStr}
-
-────────────────────────────────────────
-SKUs tracked: 9
-Darkstores covered: 49
-3PL buffer entries: 1
-🔴 Out of stock: 2 locations
-🟡 Low stock (≤3 units): 5 locations
-🟠 Reserved stock flags: 3 locations
-🟢 Replenishments detected: 8 locations
-
-OOS locations:
-- Mudhish Classic Chips — Jumeirah Village Circle
-- Mudhish Spicy Chips — Dubai Marina
-
-⚠️ Anomalies: 2 darkstores showing unusual velocity`
-        };
-        addChatMessage("Nexus", processedResult.message);
-        setResult(processedResult);
-        
+        // Read file and process CSV
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput?.files?.[0]) {
+          processedResult = await processDailyStock(fileInput.files[0]);
+        } else {
+          processedResult = { success: false, message: "No file selected" };
+        }
       } else if (selectedType === "sku_list") {
-        // Process SKU list - use bulkUpsertMasterSku
-        const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-        
-        const processedResult = {
-          success: true,
-          message: `📋 SKU LIST PROCESSED — ${dateStr}
-
-────────────────────────────────────────
-✅ SKUs synced with Convex database
-Total SKUs in system: Now available in SKU List tab
-
-Use the SKU List tab to view and manage all products.`
-        };
-        addChatMessage("Atlas", processedResult.message);
-        setResult(processedResult);
-        
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput?.files?.[0]) {
+          processedResult = await processSkuList(fileInput.files[0]);
+        } else {
+          processedResult = { success: false, message: "No file selected" };
+        }
       } else if (selectedType === "lpo") {
-        // Process LPO - insert to lpo_table and lpo_line_items
-        const processedResult = {
-          success: true,
-          message: `📄 LPO RECEIVED 
-
-────────────────────────────────────────
-LPO data saved to database.
-
-Use the Brand Performance tab to track LPO values and match with invoices.`
-        };
-        addChatMessage("Nexus", processedResult.message);
-        setResult(processedResult);
-        
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput?.files?.[0]) {
+          processedResult = await processLpo(fileInput.files[0]);
+        } else {
+          processedResult = { success: false, message: "No file selected" };
+        }
       } else if (selectedType === "invoice") {
-        // Process Invoice - insert to invoice_table, invoice_line_items, brand_performance
-        const processedResult = {
-          success: true,
-          message: `🧾 INVOICE PROCESSED
-
-────────────────────────────────────────
-Invoice saved to database.
-Service level and commission calculated.
-Data available in Brand Performance tab.`
-        };
-        addChatMessage("Nexus", processedResult.message);
-        setResult(processedResult);
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput?.files?.[0]) {
+          processedResult = await processInvoice(fileInput.files[0]);
+        } else {
+          processedResult = { success: false, message: "No file selected" };
+        }
+      } else {
+        processedResult = { success: false, message: "Unknown upload type" };
       }
+
+      if (processedResult.success) {
+        addChatMessage(config.agent, processedResult.message);
+      }
+      setResult(processedResult);
       
       // Clear files after successful processing
-      setFiles([]);
+      if (processedResult.success) {
+        setFiles([]);
+      }
       
     } catch (error) {
       console.error("Processing error:", error);
