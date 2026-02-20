@@ -18,7 +18,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 bg-white dark:bg-[#1C1C1E] border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300">
+    <aside className="w-56 bg-white dark:bg-[#1C1C1E] border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen fixed left-0 top-0 z-50">
       {/* Logo */}
       <div className="h-16 flex items-center px-5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-2">
@@ -38,7 +38,7 @@ export default function Sidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium ${
                     isActive
                       ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400"
                       : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
