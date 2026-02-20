@@ -118,7 +118,7 @@ export const bulkUpsertMasterSku = mutation({
 
 // ============ DAILY_STOCK_SNAPSHOT ============
 
-export const insertDailyStockSnapshot = mutation({
+export const upsertDailyStockSnapshot = mutation({
   args: {
     report_date: v.string(),
     sku_id: v.string(),
@@ -131,7 +131,7 @@ export const insertDailyStockSnapshot = mutation({
     effective_stock: v.number(),
   },
   handler: async (ctx, args) => {
-    // Check for duplicate by barcode + warehouse + date
+    // Check if record exists for this barcode + warehouse + date combination
     const existing = await ctx.db
       .query("daily_stock_snapshot")
       .withIndex("by_barcode_warehouse_date", (q) =>
@@ -142,10 +142,19 @@ export const insertDailyStockSnapshot = mutation({
       .first();
     
     if (existing) {
-      throw new Error("DUPLICATE_ENTRY");
+      // Update existing record with new stock values
+      await ctx.db.patch(existing._id, {
+        stock_on_hand: args.stock_on_hand,
+        putaway_reserved_qty: args.putaway_reserved_qty,
+        effective_stock: args.effective_stock,
+        product_name: args.product_name,
+      });
+      return { action: "updated", id: existing._id };
+    } else {
+      // Insert new record
+      const id = await ctx.db.insert("daily_stock_snapshot", args);
+      return { action: "inserted", id };
     }
-    
-    return await ctx.db.insert("daily_stock_snapshot", args);
   },
 });
 

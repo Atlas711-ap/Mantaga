@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import { 
-  useInsertDailyStockSnapshot, 
+  useUpsertDailyStockSnapshot,
   useBulkUpsertMasterSku, 
   useInsertLpoTable, 
   useInsertLpoLineItems,
@@ -58,7 +58,7 @@ export default function DataUploadPage() {
   const [stockReportDate, setStockReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Convex mutations
-  const insertStockSnapshot = useInsertDailyStockSnapshot();
+  const upsertStockSnapshot = useUpsertDailyStockSnapshot();
   const bulkUpsertSku = useBulkUpsertMasterSku();
   const insertLpo = useInsertLpoTable();
   const insertLpoLineItem = useInsertLpoLineItems();
@@ -136,6 +136,7 @@ export default function DataUploadPage() {
           try {
             const data = results.data as any[];
             let inserted = 0;
+            let updated = 0;
             let skipped = 0;
 
             // Filter for darkstores and 3PL warehouses only
@@ -154,7 +155,7 @@ export default function DataUploadPage() {
 
               if (barcode && warehouseName) {
                 try {
-                  await insertStockSnapshot({
+                  const result = await upsertStockSnapshot({
                     report_date: reportDate,
                     sku_id: "",
                     barcode,
@@ -165,11 +166,14 @@ export default function DataUploadPage() {
                     putaway_reserved_qty: putawayReserved,
                     effective_stock: effectiveStock,
                   });
-                  inserted++;
-                } catch (e: any) {
-                  if (e.message === "DUPLICATE_ENTRY") {
-                    skipped++;
+                  if (result?.action === "inserted") {
+                    inserted++;
+                  } else {
+                    updated++;
                   }
+                } catch (e: any) {
+                  // Skip errors but count them
+                  skipped++;
                 }
               }
             }
@@ -192,13 +196,14 @@ export default function DataUploadPage() {
               message: `📊 STOCK REPORT PROCESSED — ${new Date(reportDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
 
 ────────────────────────────────────────
-SKUs tracked: ${inserted}
+SKUs tracked: ${inserted + updated + skipped}
 Warehouses covered: ${validWarehouses.length}
 🔴 Out of stock: ${oosCount} locations
 🟡 Low stock (≤3 units): ${lowStockCount} locations
-🟢 Records inserted: ${inserted}
-⚠️ Duplicates skipped: ${skipped}`,
-              recordsProcessed: inserted,
+🟢 New records inserted: ${inserted}
+🔄 Records updated: ${updated}
+⚠️ Errors: ${skipped}`,
+              recordsProcessed: inserted + updated,
             });
           } catch (error) {
             resolve({
