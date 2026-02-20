@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
-import * as pdfjsLib from "pdfjs-dist";
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 import { 
   useUpsertDailyStockSnapshot,
@@ -326,7 +323,7 @@ Use the SKU List tab to view and manage all products.`,
     });
   };
 
-  // Process LPO Excel
+  // Process LPO Excel or PDF
   const processLpo = async (file: File): Promise<{ success: boolean; message: string; poNumber: string }> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -334,6 +331,10 @@ Use the SKU List tab to view and manage all products.`,
         try {
           // Check if PDF
           if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+            // Dynamically load PDF.js
+            const pdfjsLib = await import("pdfjs-dist");
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+            
             // Parse PDF
             const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
             const pdf = await pdfjsLib.getDocument(typedarray).promise;
