@@ -5,6 +5,10 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+import * as pdfjsLib from "pdfjs-dist";
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 import { 
   useUpsertDailyStockSnapshot,
   useBulkUpsertMasterSku, 
@@ -326,6 +330,104 @@ Use the SKU List tab to view and manage all products.`,
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
+          // Check if PDF
+          if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+            // Parse PDF
+            const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            let fullText = "";
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map((item: any) => item.str).join(" ");
+              fullText += pageText + "\n";
+            }
+            
+            // Parse LPO data from PDF text
+            // Extract PO Number (look for patterns like "PO-XXXX" or "LPO-XXXX")
+            const poMatch = fullText.match(/(?:PO|LPO|Order|Purchase Order)[-:\s]*([A-Z0-9-]+)/i) || fullText.match(/([A-Z]{2,3}[-/]\d{6,})/i);
+            const poNumber = poMatch ? poMatch[1] : `LPO${Date.now()}`;
+            
+            // Extract dates (look for patterns like DD/MM/YYYY or DD-Mon-YYYY)
+            const dateMatch = fullText.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+            let orderDate = new Date().toISOString().split('T')[0];
+            let deliveryDate = new Date().toISOString().split('T')[0];
+            if (dateMatch) {
+              const day = dateMatch[1].padStart(2, '0');
+              const month = dateMatch[2].padStart(2, '0');
+              const year = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
+              orderDate = `${year}-${month}-${day}`;
+            }
+            
+            // Extract supplier (look for common patterns)
+            const supplierMatch = fullText.match(/(?:Supplier|Vendor|From)[:\s]*([A-Za-z\s]+?)(?:\n|Delivery|$)/i);
+            const supplier = supplierMatch ? supplierMatch[1].trim() : "Talabat";
+            
+            // Extract total amount
+            const totalMatch = fullText.match(/(?:Total|Grand Total|Sum)[:\s]*AED?\s*([\d,]+\.?\d*)/i);
+            const totalInclVat = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
+            const totalExclVat = totalInclVat / 1.05;
+            const vat = totalInclVat - totalExclVat;
+            
+            // Try to extract line items (barcodes, quantities)
+            // Look for barcode patterns in the PDF
+            const barcodeMatches = fullText.match(/\b\d{10,14}\b/g) || [];
+            const uniqueBarcodes = [...new Set(barcodeMatches)];
+            
+            // For each barcode found, create a line item
+            let lineItemsCount = 0;
+            for (const barcode of uniqueBarcodes.slice(0, 20)) { // Limit to 20 items
+              await insertLpoLineItem({
+                po_number: poNumber,
+                barcode: barcode,
+                product_name: "Product from LPO",
+                quantity_ordered: 1,
+                unit_cost: totalExclVat / Math.max(uniqueBarcodes.length, 1),
+                amount_excl_vat: totalExclVat / Math.max(uniqueBarcodes.length, 1),
+                vat_pct: 5,
+                vat_amount: (totalExclVat / Math.max(uniqueBarcodes.length, 1)) * 0.05,
+                amount_incl_vat: totalInclVat / Math.max(uniqueBarcodes.length, 1),
+              });
+              lineItemsCount++;
+            }
+            
+            // Insert LPO header
+            await insertLpo({
+              po_number: poNumber,
+              order_date: orderDate,
+              delivery_date: deliveryDate,
+              supplier,
+              delivery_location: "Talabat",
+              total_excl_vat: totalExclVat,
+              total_vat: vat,
+              total_incl_vat: totalInclVat,
+            });
+            
+            resolve({
+              success: true,
+              message: `📄 LPO RECEIVED — ${poNumber}
+
+────────────────────────────────────────
+Source: PDF Document
+Order Date: ${orderDate}
+Delivery Date: ${deliveryDate}
+Supplier: ${supplier}
+
+Line items detected: ${lineItemsCount} (barcodes found in PDF)
+Total (excl. VAT): AED ${totalExclVat.toLocaleString()}
+VAT (5%): AED ${vat.toLocaleString()}
+Total (incl. VAT): AED ${totalInclVat.toLocaleString()}
+
+⚠️ Note: PDF parsing is limited. Please verify line items in system.
+
+Status: ⏳ Awaiting invoice match`,
+              poNumber,
+            });
+            return;
+          }
+          
+          // Original Excel processing
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
