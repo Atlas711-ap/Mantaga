@@ -572,39 +572,52 @@ Data available in Brand Performance tab.`,
     }
 
     try {
-      const file = files[0];
-      let processedResult: { success: boolean; message: string };
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const uploadedFiles = fileInput?.files;
+      
+      if (!uploadedFiles || uploadedFiles.length === 0) {
+        setResult({ success: false, message: "No file selected" });
+        setProcessing(false);
+        return;
+      }
+
+      let processedResult: { success: boolean; message: string; recordsProcessed?: number };
 
       if (selectedType === "daily_stock") {
-        // Read file and process CSV with selected date
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        if (fileInput?.files?.[0]) {
-          const dateStr = stockReportDate.toISOString().split('T')[0];
-          processedResult = await processDailyStock(fileInput.files[0], dateStr);
-        } else {
-          processedResult = { success: false, message: "No file selected" };
+        // Process ALL CSV files and aggregate results
+        const dateStr = stockReportDate.toISOString().split('T')[0];
+        
+        let totalInserted = 0;
+        let totalUpdated = 0;
+        let totalSkipped = 0;
+        
+        for (let i = 0; i < uploadedFiles.length; i++) {
+          const result = await processDailyStock(uploadedFiles[i], dateStr) as any;
+          totalInserted += result.inserted || 0;
+          totalUpdated += result.updated || 0;
+          totalSkipped += result.skipped || 0;
         }
+        
+        processedResult = {
+          success: true,
+          message: `📊 STOCK REPORT PROCESSED — ${new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+
+────────────────────────────────────────
+📁 Files Processed: ${uploadedFiles.length}
+🟢 New records: ${totalInserted}
+🔄 Records updated: ${totalUpdated}
+⚠️ Errors: ${totalSkipped}
+
+All ${uploadedFiles.length} files have been merged into the database.`,
+          recordsProcessed: totalInserted + totalUpdated,
+        };
+        
       } else if (selectedType === "sku_list") {
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        if (fileInput?.files?.[0]) {
-          processedResult = await processSkuList(fileInput.files[0]);
-        } else {
-          processedResult = { success: false, message: "No file selected" };
-        }
+        processedResult = await processSkuList(uploadedFiles[0]);
       } else if (selectedType === "lpo") {
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        if (fileInput?.files?.[0]) {
-          processedResult = await processLpo(fileInput.files[0]);
-        } else {
-          processedResult = { success: false, message: "No file selected" };
-        }
+        processedResult = await processLpo(uploadedFiles[0]);
       } else if (selectedType === "invoice") {
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        if (fileInput?.files?.[0]) {
-          processedResult = await processInvoice(fileInput.files[0]);
-        } else {
-          processedResult = { success: false, message: "No file selected" };
-        }
+        processedResult = await processInvoice(uploadedFiles[0]);
       } else {
         processedResult = { success: false, message: "Unknown upload type" };
       }
