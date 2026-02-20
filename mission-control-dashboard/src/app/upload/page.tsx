@@ -74,6 +74,7 @@ export default function DataUploadPage() {
   const insertInvoiceLineItem = useInsertInvoiceLineItems();
   const insertBrandPerf = useInsertBrandPerformance();
   const insertChatMessage = useInsertMessage();
+  const processInvoiceWithLpoMatch = useProcessInvoiceWithLpoMatch();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -529,7 +530,7 @@ Status: ⏳ Awaiting invoice match`,
   };
 
   // Process Invoice Excel/PDF - matches PO first, then barcode for quantity comparison
-  const processInvoice = async (file: File): Promise<{ success: boolean; message: string }> => {
+  const processInvoice = async (file: File, processWithLpoMatchFn: any): Promise<{ success: boolean; message: string }> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -594,10 +595,8 @@ Status: ⏳ Awaiting invoice match`,
             }
           }
 
-          // Use the new mutation that matches with LPO
-          const processInvoiceWithLpoMatch = useProcessInvoiceWithLpoMatch();
-          
-          const result = await processInvoiceWithLpoMatch({
+          // Use the mutation that matches with LPO
+          const result = await processWithLpoMatchFn({
             invoice_number: invoiceNumber,
             invoice_date: invoiceDate,
             po_number: poNumber,
@@ -709,7 +708,7 @@ All ${uploadedFiles.length} files have been merged into the database.`,
       } else if (selectedType === "lpo") {
         processedResult = await processLpo(uploadedFiles[0]);
       } else if (selectedType === "invoice") {
-        processedResult = await processInvoice(uploadedFiles[0]);
+        processedResult = await processInvoice(uploadedFiles[0], processInvoiceWithLpoMatch);
       } else {
         processedResult = { success: false, message: "Unknown upload type" };
       }
