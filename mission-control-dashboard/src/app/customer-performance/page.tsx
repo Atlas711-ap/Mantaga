@@ -22,6 +22,11 @@ interface DarkstoreData {
 
 type ViewMode = "sku" | "darkstore";
 
+function normalizeBarcode(barcode: string): string {
+  // Remove leading zeros and any non-numeric characters
+  return String(barcode).replace(/^0+/, '').replace(/[^0-9]/g, '');
+}
+
 function formatDarkstoreName(name: string): string {
   // Remove prefixes like UAE_Dubai_
   return name.replace(/^UAE_Dubai_/, "").replace(/_/g, " ");
@@ -47,19 +52,23 @@ export default function CustomerPerformancePage() {
   const skuSummary: SkuSummary[] = useMemo(() => {
     if (!stockData) return [];
     
-    // Create a map of barcode -> SKU name from master_sku
+    // Create a map of normalized barcode -> SKU name from master_sku
     const skuNameMap: Record<string, string> = {};
     if (skus) {
       skus.forEach(sku => {
-        skuNameMap[sku.barcode] = sku.sku_name;
+        const normalized = normalizeBarcode(sku.barcode);
+        if (normalized && !skuNameMap[normalized]) {
+          skuNameMap[normalized] = sku.sku_name;
+        }
       });
     }
     
-    // Group stock by barcode
+    // Group stock by normalized barcode
     const byBarcode: Record<string, typeof stockData> = {};
     stockData.forEach(s => {
-      if (!byBarcode[s.barcode]) byBarcode[s.barcode] = [];
-      byBarcode[s.barcode].push(s);
+      const normalized = normalizeBarcode(s.barcode);
+      if (!byBarcode[normalized]) byBarcode[normalized] = [];
+      byBarcode[normalized].push(s);
     });
     
     return Object.entries(byBarcode).map(([barcode, stock]) => {
@@ -103,8 +112,10 @@ export default function CustomerPerformancePage() {
   const selectedDarkstoreData: DarkstoreData[] = useMemo(() => {
     if (!selectedSku || !stockData) return [];
     
+    const normalizedBarcode = normalizeBarcode(selectedSku.barcode);
+    
     return stockData
-      .filter(s => s.barcode === selectedSku.barcode)
+      .filter(s => normalizeBarcode(s.barcode) === normalizedBarcode)
       .map(s => ({
         darkstore: s.warehouse_name,
         current_stock: s.stock_on_hand || 0,
