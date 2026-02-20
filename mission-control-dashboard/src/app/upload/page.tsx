@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import { 
@@ -55,7 +57,8 @@ export default function DataUploadPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   
   // Date picker for daily stock report
-  const [stockReportDate, setStockReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [stockReportDate, setStockReportDate] = useState<Date>(new Date());
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   // Convex mutations
   const upsertStockSnapshot = useUpsertDailyStockSnapshot();
@@ -553,7 +556,8 @@ Data available in Brand Performance tab.`,
         // Read file and process CSV with selected date
         const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
         if (fileInput?.files?.[0]) {
-          processedResult = await processDailyStock(fileInput.files[0], stockReportDate);
+          const dateStr = stockReportDate.toISOString().split('T')[0];
+          processedResult = await processDailyStock(fileInput.files[0], dateStr);
         } else {
           processedResult = { success: false, message: "No file selected" };
         }
@@ -654,13 +658,22 @@ Data available in Brand Performance tab.`,
               <label className="block text-xs font-medium text-slate-400 mb-2">
                 📊 Report Date (for all rows in this CSV)
               </label>
-              <input
-                type="date"
-                value={stockReportDate}
-                onChange={(e) => setStockReportDate(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white"
-              />
-              <p className="text-xs text-slate-500 mt-2">
+              <div className="relative">
+                <DatePicker
+                  selected={stockReportDate}
+                  onChange={(date: Date | null) => date && setStockReportDate(date)}
+                  open={datePickerOpen}
+                  onInputClick={() => setDatePickerOpen(true)}
+                  onClickOutside={() => setDatePickerOpen(false)}
+                  dateFormat="EEEE, dd MMMM yyyy"
+                  inline
+                  maxDate={new Date()}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-3">
+                Selected: <span className="text-white font-medium">{stockReportDate.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
                 This date will be used as the report_date for every row written to the database.
               </p>
             </div>
