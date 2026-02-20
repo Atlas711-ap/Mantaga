@@ -57,6 +57,15 @@ export const getLatestDailyStockSnapshot = query({
   },
 });
 
+// Get ALL stock data across all dates (for cumulative SKU tracking)
+export const getAllDailyStockSnapshot = query({
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("daily_stock_snapshot")
+      .collect();
+  },
+});
+
 export const getDailyStockSnapshotByBarcodeWarehouse = query({
   args: { barcode: v.string(), warehouse_name: v.string() },
   handler: async (ctx, args) => {

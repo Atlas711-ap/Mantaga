@@ -35,6 +35,10 @@ export function useLatestDailyStockSnapshot() {
   return useQuery(api.queries.getLatestDailyStockSnapshot);
 }
 
+export function useAllDailyStockSnapshot() {
+  return useQuery(api.queries.getAllDailyStockSnapshot);
+}
+
 export function useUpsertDailyStockSnapshot() {
   return useMutation(api.mutations.upsertDailyStockSnapshot);
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useMasterSku, useLatestDailyStockSnapshot } from "../../hooks/useConvex";
+import { useState, useMemo, useEffect } from "react";
+import { useMasterSku, useLatestDailyStockSnapshot, useAllDailyStockSnapshot } from "../../hooks/useConvex";
 
 interface SkuSummary {
   barcode: string;
@@ -44,13 +44,35 @@ function is3PLWarehouse(name: string): boolean {
 
 export default function CustomerPerformancePage() {
   const skus = useMasterSku();
-  const stockData = useLatestDailyStockSnapshot();
+  const latestStockData = useLatestDailyStockSnapshot();
+  const allStockData = useAllDailyStockSnapshot();
   const [view, setView] = useState<ViewMode>("sku");
   const [selectedSku, setSelectedSku] = useState<SkuSummary | null>(null);
+  const [knownSkus, setKnownSkus] = useState<Set<string>>(new Set());
 
-  // Transform Convex data to SKU summary format - join with master_sku for product names
+  // Accumulate known SKUs from all stock data (they never disappear once discovered)
+  useEffect(() => {
+    if (allStockData && allStockData.length > 0) {
+      setKnownSkus(prev => {
+        const newKnown = new Set(prev);
+        allStockData.forEach(s => {
+          const normalized = normalizeBarcode(s.barcode);
+          if (normalized) newKnown.add(normalized);
+        });
+        return newKnown;
+      });
+    }
+  }, [allStockData]);
+
+  // Use latest stock data for current numbers
+  const stockData = latestStockData;
+
+  // Transform Convex data to SKU summary format - use all known SKUs with latest data
   const skuSummary: SkuSummary[] = useMemo(() => {
     if (!stockData) return [];
+    
+    // Get unique barcodes from known SKUs (accumulated over time)
+    const knownBarcodes = Array.from(knownSkus);
     
     // Create a map of normalized barcode -> SKU name from master_sku
     const skuNameMap: Record<string, string> = {};
@@ -63,7 +85,7 @@ export default function CustomerPerformancePage() {
       });
     }
     
-    // Group stock by normalized barcode
+    // Group latest stock data by normalized barcode
     const byBarcode: Record<string, typeof stockData> = {};
     stockData.forEach(s => {
       const normalized = normalizeBarcode(s.barcode);
@@ -71,7 +93,10 @@ export default function CustomerPerformancePage() {
       byBarcode[normalized].push(s);
     });
     
-    return Object.entries(byBarcode).map(([barcode, stock]) => {
+    // Build SKU list from known SKUs, using latest data for numbers
+    return knownBarcodes.map(barcode => {
+      const stock = byBarcode[barcode] || [];
+      
       // Use master SKU name if available, otherwise use product_name from stock data
       const productName = skuNameMap[barcode] || stock[0]?.product_name || barcode;
       
@@ -105,8 +130,8 @@ export default function CustomerPerformancePage() {
         active_ds: activeDs,
         inactive_ds: inactiveDs,
       };
-    }).filter(sku => sku.soh >= 0);
-  }, [skus, stockData]);
+    }).filter(sku => sku.sku_name); // Only show SKUs with names
+  }, [skus, stockData, knownSkus]);
 
   // Get darkstore breakdown for selected SKU
   const selectedDarkstoreData: DarkstoreData[] = useMemo(() => {
