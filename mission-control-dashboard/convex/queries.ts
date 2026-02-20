@@ -45,12 +45,14 @@ export const getLatestDailyStockSnapshot = query({
   handler: async (ctx) => {
     const all = await ctx.db
       .query("daily_stock_snapshot")
-      .withIndex("by_date")
       .collect();
     if (all.length === 0) return [];
-    // Get the latest date
-    const latestDate = all.reduce((max, item) => 
-      item.report_date > max ? item.report_date : max, all[0].report_date);
+    
+    // Get the latest date by comparing report_date strings
+    const dates = [...new Set(all.map(item => item.report_date))];
+    const latestDate = dates.sort().reverse()[0];
+    
+    // Return all records for the latest date
     return all.filter(item => item.report_date === latestDate);
   },
 });
