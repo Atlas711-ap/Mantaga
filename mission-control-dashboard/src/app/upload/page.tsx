@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
-
 import { 
   useUpsertDailyStockSnapshot,
   useBulkUpsertMasterSku, 
@@ -14,8 +13,7 @@ import {
   useInsertInvoiceTable,
   useInsertInvoiceLineItems,
   useInsertBrandPerformance,
-  useInsertMessage,
-  useProcessInvoiceWithLpoMatch
+  useInsertMessage
 } from "../../hooks/useConvex";
 
 type UploadType = "daily_stock" | "sku_list" | "lpo" | "invoice";
@@ -71,7 +69,6 @@ export default function DataUploadPage() {
   const insertInvoiceLineItem = useInsertInvoiceLineItems();
   const insertBrandPerf = useInsertBrandPerformance();
   const insertChatMessage = useInsertMessage();
-  const processInvoiceWithLpoMatch = useProcessInvoiceWithLpoMatch();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -323,114 +320,12 @@ Use the SKU List tab to view and manage all products.`,
     });
   };
 
-  // Process LPO Excel or PDF
+  // Process LPO Excel
   const processLpo = async (file: File): Promise<{ success: boolean; message: string; poNumber: string }> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          // Check if PDF
-          if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-            // Dynamically load PDF.js
-            const pdfjsLib = await import("pdfjs-dist");
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-            
-            // Parse PDF
-            const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
-            const pdf = await pdfjsLib.getDocument(typedarray).promise;
-            let fullText = "";
-            
-            for (let i = 1; i <= pdf.numPages; i++) {
-              const page = await pdf.getPage(i);
-              const textContent = await page.getTextContent();
-              const pageText = textContent.items.map((item: any) => item.str).join(" ");
-              fullText += pageText + "\n";
-            }
-            
-            // Parse LPO data from PDF text
-            // Extract PO Number (look for patterns like "PO-XXXX" or "LPO-XXXX")
-            const poMatch = fullText.match(/(?:PO|LPO|Order|Purchase Order)[-:\s]*([A-Z0-9-]+)/i) || fullText.match(/([A-Z]{2,3}[-/]\d{6,})/i);
-            const poNumber = poMatch ? poMatch[1] : `LPO${Date.now()}`;
-            
-            // Extract dates (look for patterns like DD/MM/YYYY or DD-Mon-YYYY)
-            const dateMatch = fullText.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-            let orderDate = new Date().toISOString().split('T')[0];
-            let deliveryDate = new Date().toISOString().split('T')[0];
-            if (dateMatch) {
-              const day = dateMatch[1].padStart(2, '0');
-              const month = dateMatch[2].padStart(2, '0');
-              const year = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
-              orderDate = `${year}-${month}-${day}`;
-            }
-            
-            // Extract supplier (look for common patterns)
-            const supplierMatch = fullText.match(/(?:Supplier|Vendor|From)[:\s]*([A-Za-z\s]+?)(?:\n|Delivery|$)/i);
-            const supplier = supplierMatch ? supplierMatch[1].trim() : "Talabat";
-            
-            // Extract total amount
-            const totalMatch = fullText.match(/(?:Total|Grand Total|Sum)[:\s]*AED?\s*([\d,]+\.?\d*)/i);
-            const totalInclVat = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
-            const totalExclVat = totalInclVat / 1.05;
-            const vat = totalInclVat - totalExclVat;
-            
-            // Try to extract line items (barcodes, quantities)
-            // Look for barcode patterns in the PDF
-            const barcodeMatches = fullText.match(/\b\d{10,14}\b/g) || [];
-            const uniqueBarcodes = [...new Set(barcodeMatches)];
-            
-            // For each barcode found, create a line item
-            let lineItemsCount = 0;
-            for (const barcode of uniqueBarcodes.slice(0, 20)) { // Limit to 20 items
-              await insertLpoLineItem({
-                po_number: poNumber,
-                barcode: barcode,
-                product_name: "Product from LPO",
-                quantity_ordered: 1,
-                unit_cost: totalExclVat / Math.max(uniqueBarcodes.length, 1),
-                amount_excl_vat: totalExclVat / Math.max(uniqueBarcodes.length, 1),
-                vat_pct: 5,
-                vat_amount: (totalExclVat / Math.max(uniqueBarcodes.length, 1)) * 0.05,
-                amount_incl_vat: totalInclVat / Math.max(uniqueBarcodes.length, 1),
-              });
-              lineItemsCount++;
-            }
-            
-            // Insert LPO header
-            await insertLpo({
-              po_number: poNumber,
-              order_date: orderDate,
-              delivery_date: deliveryDate,
-              supplier,
-              delivery_location: "Talabat",
-              total_excl_vat: totalExclVat,
-              total_vat: vat,
-              total_incl_vat: totalInclVat,
-            });
-            
-            resolve({
-              success: true,
-              message: `📄 LPO RECEIVED — ${poNumber}
-
-────────────────────────────────────────
-Source: PDF Document
-Order Date: ${orderDate}
-Delivery Date: ${deliveryDate}
-Supplier: ${supplier}
-
-Line items detected: ${lineItemsCount} (barcodes found in PDF)
-Total (excl. VAT): AED ${totalExclVat.toLocaleString()}
-VAT (5%): AED ${vat.toLocaleString()}
-Total (incl. VAT): AED ${totalInclVat.toLocaleString()}
-
-⚠️ Note: PDF parsing is limited. Please verify line items in system.
-
-Status: ⏳ Awaiting invoice match`,
-              poNumber,
-            });
-            return;
-          }
-          
-          // Original Excel processing
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
@@ -530,22 +425,12 @@ Status: ⏳ Awaiting invoice match`,
     });
   };
 
-  // Process Invoice Excel/PDF - matches PO first, then barcode for quantity comparison
-  const processInvoice = async (file: File, processWithLpoMatchFn: any): Promise<{ success: boolean; message: string }> => {
+  // Process Invoice Excel
+  const processInvoice = async (file: File): Promise<{ success: boolean; message: string }> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          // Handle PDF
-          if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-            // Similar PDF parsing as LPO - for now just return an error
-            resolve({
-              success: false,
-              message: "Invoice PDF parsing not yet supported. Please convert to Excel format.",
-            });
-            return;
-          }
-          
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
@@ -564,40 +449,16 @@ Status: ⏳ Awaiting invoice match`,
             return;
           }
 
-          const invoiceNumber = String(headerRow["Invoice Number"] || headerRow["Invoice No"] || headerRow.invoice_number || `INV${Date.now()}`);
-          const invoiceDate = String(headerRow["Invoice Date"] || headerRow.InvoiceDate || headerRow.invoice_date || new Date().toISOString().split('T')[0]);
-          const poNumber = String(headerRow["PO Number"] || headerRow["PO No"] || headerRow.po_number || "");
-          const customer = String(headerRow.Customer || headerRow.customer || "Quadrant International");
-          const subtotal = parseFloat(String(headerRow.Subtotal || headerRow.subtotal || "0")) || 0;
-          const vatAmount = parseFloat(String(headerRow["VAT Amount"] || headerRow.vat_amount || "0")) || 0;
-          const grandTotal = parseFloat(String(headerRow["Grand Total"] || headerRow["Total (incl. VAT)"] || headerRow.grand_total || "0")) || (subtotal + vatAmount);
+          const invoiceNumber = headerRow["Invoice Number"] || headerRow["Invoice No"] || headerRow.invoice_number || `INV${Date.now()}`;
+          const invoiceDate = headerRow["Invoice Date"] || headerRow.InvoiceDate || headerRow.invoice_date || new Date().toISOString().split('T')[0];
+          const poNumber = headerRow["PO Number"] || headerRow["PO No"] || headerRow.po_number || "";
+          const customer = headerRow.Customer || headerRow.customer || "Quadrant International";
+          const subtotal = parseFloat(headerRow.Subtotal || headerRow.subtotal || "0");
+          const vatAmount = parseFloat(headerRow["VAT Amount"] || headerRow.vat_amount || "0");
+          const grandTotal = parseFloat(headerRow["Grand Total"] || headerRow["Total (incl. VAT)"] || headerRow.grand_total || (subtotal + vatAmount));
 
-          // Build line items
-          const lineItems: any[] = [];
-          for (const row of jsonData) {
-            const barcode = String(row.Barcode || row.barcode || row["SKU Barcode"] || "").trim();
-            const productName = String(row["Product Name"] || row.Product || row.sku_name || row.name || "");
-            const quantity = parseInt(String(row.Quantity || row.qty || row["Qty Invoiced"] || "0")) || 0;
-            const unitRate = parseFloat(String(row["Unit Rate"] || row["Unit Price"] || row.unit_rate || "0")) || 0;
-            const taxableAmount = parseFloat(String(row["Taxable Amount"] || row.taxable_amount || "0")) || (quantity * unitRate);
-            const lineVatAmount = parseFloat(String(row["VAT Amount"] || row.vat_amount || "0")) || 0;
-            const expiryDate = row["Expiry Date"] || row.expiry_date || undefined;
-
-            if (barcode && productName && quantity > 0) {
-              lineItems.push({
-                barcode,
-                product_name: productName,
-                quantity_invoiced: quantity,
-                unit_rate: unitRate,
-                taxable_amount: taxableAmount,
-                vat_amount: lineVatAmount,
-                expiry_date: expiryDate ? String(expiryDate) : undefined,
-              });
-            }
-          }
-
-          // Use the mutation that matches with LPO
-          const result = await processWithLpoMatchFn({
+          // Insert Invoice header
+          await insertInvoice({
             invoice_number: invoiceNumber,
             invoice_date: invoiceDate,
             po_number: poNumber,
@@ -605,14 +466,78 @@ Status: ⏳ Awaiting invoice match`,
             subtotal,
             vat_amount: vatAmount,
             grand_total: grandTotal,
-            line_items: lineItems,
           });
 
-          const lineItemsCount = lineItems.length;
-          const serviceLevel = result?.service_level_pct || 100;
-          const matchStatus = result?.match_status || "MATCHED";
-          const commissionAed = result?.commission_aed || (subtotal * 0.05);
-          const gapQty = result?.gap_qty || 0;
+          // Process line items
+          let lineItemsCount = 0;
+          let totalInvoicedExclVat = 0;
+          
+          for (const row of jsonData) {
+            const barcode = row.Barcode || row.barcode || row["SKU Barcode"];
+            const productName = row["Product Name"] || row.Product || row.sku_name || row.name;
+            const quantity = parseInt(row.Quantity || row.qty || row["Qty Invoiced"] || "0");
+            const unitRate = parseFloat(row["Unit Rate"] || row["Unit Price"] || row.unit_rate || "0");
+            const taxableAmount = parseFloat(row["Taxable Amount"] || row.taxable_amount || (quantity * unitRate));
+            const lineVatAmount = parseFloat(row["VAT Amount"] || row.vat_amount || "0");
+            const expiryDate = row["Expiry Date"] || row.expiry_date || undefined;
+
+            if (barcode && productName && quantity > 0) {
+              await insertInvoiceLineItem({
+                invoice_number: invoiceNumber,
+                po_number: poNumber,
+                barcode,
+                product_name: productName,
+                expiry_date: expiryDate,
+                unit_rate: unitRate,
+                quantity_invoiced: quantity,
+                taxable_amount: taxableAmount,
+                vat_amount: lineVatAmount,
+              });
+              lineItemsCount++;
+              totalInvoicedExclVat += taxableAmount;
+            }
+          }
+
+          // Get LPO value for comparison
+          let lpoValueExclVat = subtotal; // fallback
+          let serviceLevelPct = 100;
+          let gapValue = 0;
+          let matchStatus = "MATCHED";
+
+          if (poNumber) {
+            gapValue = lpoValueExclVat - totalInvoicedExclVat;
+            if (Math.abs(gapValue) < 0.01) {
+              serviceLevelPct = 100;
+              matchStatus = "MATCHED";
+            } else if (gapValue > 0) {
+              serviceLevelPct = Math.max(0, (totalInvoicedExclVat / lpoValueExclVat) * 100);
+              matchStatus = "DISCREPANCY";
+            } else {
+              serviceLevelPct = 100;
+              matchStatus = "MATCHED";
+            }
+          }
+
+          const commissionAed = totalInvoicedExclVat * 0.05; // 5% commission
+
+          // Insert brand performance record
+          const now = new Date();
+          await insertBrandPerf({
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+            po_number: poNumber,
+            po_date: invoiceDate,
+            invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
+            lpo_value_excl_vat: lpoValueExclVat,
+            lpo_value_incl_vat: lpoValueExclVat * 1.05,
+            invoiced_value_excl_vat: totalInvoicedExclVat,
+            invoiced_value_incl_vat: totalInvoicedExclVat * 1.05,
+            gap_value: gapValue,
+            service_level_pct: serviceLevelPct,
+            commission_aed: commissionAed,
+            match_status: matchStatus,
+          });
 
           resolve({
             success: true,
@@ -624,16 +549,11 @@ PO Number: ${poNumber || "N/A"}
 Customer: ${customer}
 
 Line items: ${lineItemsCount}
-Invoiced Value (excl. VAT): AED ${subtotal.toLocaleString()}
+Invoiced Value (excl. VAT): AED ${totalInvoicedExclVat.toLocaleString()}
 VAT: AED ${vatAmount.toLocaleString()}
 Total: AED ${grandTotal.toLocaleString()}
 
-📊 LPO Match Analysis:
-├─ Ordered Qty (from LPO): ${result?.total_ordered || 0}
-├─ Invoiced Qty: ${result?.total_invoiced || 0}
-└─ Gap Qty: ${gapQty}
-
-Service Level: ${serviceLevel.toFixed(1)}%
+Service Level: ${serviceLevelPct.toFixed(1)}%
 Commission Earned: AED ${commissionAed.toFixed(2)}
 Match Status: ${matchStatus}
 
@@ -709,7 +629,7 @@ All ${uploadedFiles.length} files have been merged into the database.`,
       } else if (selectedType === "lpo") {
         processedResult = await processLpo(uploadedFiles[0]);
       } else if (selectedType === "invoice") {
-        processedResult = await processInvoice(uploadedFiles[0], processInvoiceWithLpoMatch);
+        processedResult = await processInvoice(uploadedFiles[0]);
       } else {
         processedResult = { success: false, message: "Unknown upload type" };
       }
