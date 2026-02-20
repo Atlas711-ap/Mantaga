@@ -356,3 +356,127 @@ export const deleteCalendarEvent = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+// ============ INVOICE WITH LPO MATCHING ============
+
+export const processInvoiceWithLpoMatch = mutation({
+  args: {
+    invoice_number: v.string(),
+    invoice_date: v.string(),
+    po_number: v.string(),
+    customer: v.string(),
+    subtotal: v.number(),
+    vat_amount: v.number(),
+    grand_total: v.number(),
+    line_items: v.array(v.object({
+      barcode: v.string(),
+      product_name: v.string(),
+      quantity_invoiced: v.number(),
+      unit_rate: v.number(),
+      taxable_amount: v.number(),
+      vat_amount: v.number(),
+      expiry_date: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // Insert invoice header
+    await ctx.db.insert("invoice_table", {
+      invoice_number: args.invoice_number,
+      invoice_date: args.invoice_date,
+      po_number: args.po_number,
+      customer: args.customer,
+      subtotal: args.subtotal,
+      vat_amount: args.vat_amount,
+      grand_total: args.grand_total,
+    });
+
+    // Get LPO line items for comparison
+    const lpoLineItems = await ctx.db
+      .query("lpo_line_items")
+      .withIndex("by_po_number", (q) => q.eq("po_number", args.po_number))
+      .collect();
+
+    // Create a map of LPO line items by barcode
+    const lpoMap: Record<string, typeof lpoLineItems[0]> = {};
+    lpoLineItems.forEach(item => {
+      lpoMap[item.barcode] = item;
+    });
+
+    let totalOrderedQty = 0;
+    let totalInvoicedQty = 0;
+
+    // Insert invoice line items with quantity comparison
+    for (const item of args.line_items) {
+      await ctx.db.insert("invoice_line_items", {
+        invoice_number: args.invoice_number,
+        po_number: args.po_number,
+        barcode: item.barcode,
+        product_name: item.product_name,
+        quantity_invoiced: item.quantity_invoiced,
+        unit_rate: item.unit_rate,
+        taxable_amount: item.taxable_amount,
+        vat_amount: item.vat_amount,
+        expiry_date: item.expiry_date,
+      });
+
+      totalInvoicedQty += item.quantity_invoiced;
+
+      // Get ordered quantity from LPO
+      const lpoItem = lpoMap[item.barcode];
+      if (lpoItem) {
+        totalOrderedQty += lpoItem.quantity_ordered;
+      }
+    }
+
+    // Calculate service level
+    const serviceLevelPct = totalOrderedQty > 0 
+      ? (totalInvoicedQty / totalOrderedQty) * 100 
+      : 100;
+
+    const gapQty = totalOrderedQty - totalInvoicedQty;
+    const gapValue = gapQty * (args.subtotal / (totalInvoicedQty || 1));
+    const matchStatus = Math.abs(gapQty) <= 2 ? "MATCHED" : "DISCREPANCY";
+
+    // Calculate commission (5% of invoiced value)
+    const commissionAed = args.subtotal * 0.05;
+
+    // Get LPO header for values
+    const lpoHeader = await ctx.db
+      .query("lpo_table")
+      .withIndex("by_po_number", (q) => q.eq("po_number", args.po_number))
+      .first();
+
+    const lpoValueExclVat = lpoHeader?.total_excl_vat || args.subtotal;
+    const lpoValueInclVat = lpoHeader?.total_incl_vat || args.grand_total;
+
+    // Insert brand performance record
+    const now = new Date();
+    await ctx.db.insert("brand_performance", {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      po_number: args.po_number,
+      po_date: lpoHeader?.order_date || args.invoice_date,
+      invoice_number: args.invoice_number,
+      invoice_date: args.invoice_date,
+      lpo_value_excl_vat: lpoValueExclVat,
+      lpo_value_incl_vat: lpoValueInclVat,
+      invoiced_value_excl_vat: args.subtotal,
+      invoiced_value_incl_vat: args.grand_total,
+      gap_value: gapValue,
+      service_level_pct: serviceLevelPct,
+      commission_aed: commissionAed,
+      match_status: matchStatus,
+    });
+
+    return {
+      invoice_number: args.invoice_number,
+      po_number: args.po_number,
+      total_ordered: totalOrderedQty,
+      total_invoiced: totalInvoicedQty,
+      gap_qty: gapQty,
+      service_level_pct: serviceLevelPct,
+      match_status: matchStatus,
+      commission_aed: commissionAed,
+    };
+  },
+});

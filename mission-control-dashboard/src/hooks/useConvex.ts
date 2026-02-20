@@ -109,6 +109,10 @@ export function useInsertInvoiceLineItems() {
   return useMutation(api.mutations.insertInvoiceLineItems);
 }
 
+export function useProcessInvoiceWithLpoMatch() {
+  return useMutation(api.mutations.processInvoiceWithLpoMatch);
+}
+
 // Brand Performance
 export function useBrandPerformance() {
   return useQuery(api.queries.getBrandPerformance);
