@@ -145,7 +145,7 @@ export default function DataUploadPage() {
             // Process all rows - be more flexible with column names
             const allRows = data.filter((row: any) => {
               // Check if row has any identifying data
-              const barcode = row.barcode || row.Barcode || row.sku_barcode || row.product_barcode || row["SKU Barcode"] || "";
+              const barcode = row.barcodes || row.barcode || row.Barcode || row.sku_barcode || row.product_barcode || row["SKU Barcode"] || "";
               return barcode && barcode.length > 0;
             });
 
@@ -154,7 +154,7 @@ export default function DataUploadPage() {
 
             for (const row of validWarehouses) {
               // Flexible column name matching
-              const barcode = row.barcode || row.Barcode || row.sku_barcode || row.product_barcode || row["SKU Barcode"] || "";
+              const barcode = row.barcodes || row.barcode || row.Barcode || row.sku_barcode || row.product_barcode || row["SKU Barcode"] || "";
               const warehouseName = row.warehouse_name || row.Warehouse || row.warehouse || row.WarehouseName || row.location || "";
               const productName = row.product_name || row.Product || row.sku_name || row.name || row["Product Name"] || "Unknown";
               const stockOnHand = parseInt(row.stock_on_hand || row.Stock || row.stock || row.qty || row.Quantity || row["Stock on Hand"] || "0");
