@@ -288,7 +288,9 @@ export default function DataUploadPage() {
             talabat_ptt: row["Talabat PTT"] || row.talabat_ptt ? parseFloat(String(row["Talabat PTT"] || row.talabat_ptt || "0")) : undefined,
             noon_ptt: row["Noon PTT"] || row.noon_ptt ? parseFloat(String(row["Noon PTT"] || row.noon_ptt || "0")) : undefined,
             careem_ptt: row["Careem PTT"] || row.careem_ptt ? parseFloat(String(row["Careem PTT"] || row.careem_ptt || "0")) : undefined,
-            mantaga_commission_pct: row["Commission %"] || row["Mantaga Commission %"] || row.mantaga_commission_pct ? parseFloat(String(row["Commission %"] || row["Mantaga Commission %"] || "0")) : undefined,
+            // Commission - Excel stores percentages as decimals (10% = 0.1), so multiply by 100
+            mantaga_commission_pct: row["Commission %"] || row["Mantaga Commission %"] || row.mantaga_commission_pct ? 
+              (parseFloat(String(row["Commission %"] || row["Mantaga Commission %"] || row.mantaga_commission_pct || "0")) * 100) : undefined,
           })).filter(sku => sku.barcode && sku.sku_name);
 
           if (skus.length > 0) {
