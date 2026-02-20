@@ -1,95 +1,331 @@
-export default function ChatroomPage() {
-  const agents = [
-    { name: "Athena", status: "IDLE", color: "amber" },
-    { name: "Nexus", status: "IDLE", color: "cyan" },
-    { name: "Atlas", status: "IDLE", color: "emerald" },
-    { name: "Forge", status: "IDLE", color: "violet" },
-  ];
+"use client";
 
-  const messages = [
-    { sender: "System", type: "system", text: "System initialized — all agents online", time: "15:00" },
-  ];
+import { useState, useRef, useEffect } from "react";
+
+interface Message {
+  id: string;
+  sender: string;
+  sender_type: "agent" | "user" | "system";
+  timestamp: string;
+  content: string;
+  badge?: string;
+  attachment?: string;
+}
+
+interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+  status: "ACTIVE" | "IDLE" | "ERROR";
+}
+
+const agents: Agent[] = [
+  { id: "athena", name: "Athena", role: "CEO", color: "#F59E0B", status: "ACTIVE" },
+  { id: "nexus", name: "Nexus", role: "Operations", color: "#06B6D4", status: "ACTIVE" },
+  { id: "atlas", name: "Atlas", role: "SKU Coordinator", color: "#10B981", status: "IDLE" },
+  { id: "forge", name: "Forge", role: "Developer", color: "#8B5CF6", status: "IDLE" },
+];
+
+const mockMessages: Message[] = [
+  { id: "1", sender: "Forge", sender_type: "agent", timestamp: "19 Feb 2026, 07:45", badge: "⚡ SCHEDULED", content: "System health check complete — all 8 cron jobs ran successfully overnight. No errors detected. System performance nominal." },
+  { id: "2", sender: "Atlas", sender_type: "agent", timestamp: "19 Feb 2026, 08:00", badge: "⚡ SCHEDULED", content: "Barcode cross-reference complete — all barcodes in today's stock report match MASTER_SKU. No unknown SKUs detected." },
+  { id: "3", sender: "Athena", sender_type: "agent", timestamp: "19 Feb 2026, 09:00", badge: "📋 DAILY BRIEF", content: "Good morning. Here is today's operational summary:\n\n📊 Stock: 4 OOS locations, 7 low stock alerts. DS_4 Barsha 1 has been OOS for 3 consecutive days — @Nexus please flag for Talabat follow-up.\n\n💰 Finance: Last invoice (62693) matched PO3851128 at 100% service level. Commission AED 420 earned.\n\n📋 Catalogue: All 9 SKUs active. 2 SKUs missing shelf life data — @Atlas to follow up.\n\n⚙️ System: All automations running clean.\n\nAction items: Follow up on DS_4 Barsha 1 OOS situation.\n\n— Athena" },
+  { id: "4", sender: "Anush", sender_type: "user", timestamp: "19 Feb 2026, 09:15", content: "@nexus how long has DS_4 Barsha 1 been OOS for Al Mudhish Ready Salt?" },
+  { id: "5", sender: "Nexus", sender_type: "agent", timestamp: "19 Feb 2026, 09:15", content: "DS_4 Barsha 1 — Al Mudhish Chips Ready Salt 75g:\n• Current stock: 0 units\n• OOS since: 17 Feb 2026 (3 consecutive days)\n• Last replenishment: 10 Feb 2026\n• Avg replenishment cycle at this darkstore: 3.2 days\n• 3PL buffer stock: 276 units available\n\nAssessment: Overdue for replenishment. Talabat has sufficient buffer stock at 3PL to replenish. Likely a Talabat internal logistics delay." },
+  { id: "6", sender: "Anush", sender_type: "user", timestamp: "19 Feb 2026, 09:18", content: "noted, keep monitoring. also @atlas are the 2 SKUs with missing shelf life data from Mudhish or Suroor?" },
+  { id: "7", sender: "Atlas", sender_type: "agent", timestamp: "19 Feb 2026, 09:18", content: "The 2 SKUs with missing shelf life data are both from the Mudhish range:\n• Al Mudhish Chips Tortilla Pizza 100g (barcode: 09501033112049)\n• Al Mudhish Ripples Crunch Chilli 15g (barcode: 09501033112629)\n\nBoth are also missing Case Pack values. Please update these in the SKU List tab at your earliest convenience." },
+  { id: "8", sender: "system", sender_type: "system", timestamp: "19 Feb 2026, 13:02", content: "— Daily stock report uploaded by Anush (user) — queued for Nexus processing at 2:00 PM —" },
+  { id: "9", sender: "Nexus", sender_type: "agent", timestamp: "19 Feb 2026, 14:00", badge: "⚡ SCHEDULED", content: "📊 Stock Report Processed — 19 Feb 2026\n─────────────────────────\nSKUs tracked: 9\nDarkstores covered: 49\n\n🔴 OOS: 4 locations\n🟡 Low stock (≤3 units): 7 locations\n🟢 Replenishments detected: 3 locations\n\nOOS locations:\n• Al Mudhish Ready Salt 75g — DS_4 Barsha 1 (3rd consecutive day)\n• Al Mudhish Ready Salt 75g — DS_15 Khaldiya Tmart\n• Al Mudhish Rip. Cru. Chill 75g — DS_1 Business Bay\n• Suroor Chips Tomato 14g — DS_60 Sanaya\n\nReplenishments detected:\n• Al Mudhish Sour Cream 75g — DS_36 Bahia (+120 units)\n• Suroor Mexican 15g — DS_27 Al Hamidiya (+22 units)\n• Suroor Crispstix 18g — DS_21 Shamkha (+70 units)" },
+];
+
+const recentActivity = [
+  { agent: "Nexus", action: "Stock report processed", time: "2h ago" },
+  { agent: "Atlas", action: "SKU data validated", time: "4h ago" },
+  { agent: "Athena", action: "Daily brief sent", time: "5h ago" },
+  { agent: "Forge", action: "System health check", time: "6h ago" },
+  { agent: "Nexus", action: "Invoice matched", time: "7h ago" },
+];
+
+const quickActions = [
+  { label: "📊 Ask for stock update", prompt: "@nexus What is the current stock status across all darkstores?" },
+  { label: "📋 Ask for SKU check", prompt: "@atlas Are there any incomplete SKU records?" },
+  { label: "🔍 Ask for daily summary", prompt: "@athena Give me a quick summary of today's operations" },
+];
+
+export default function ChatroomPage() {
+  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [input, setInput] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      sender: "Anush",
+      sender_type: "user",
+      timestamp: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      content: input,
+    };
+    
+    setMessages([...messages, newMessage]);
+    setInput("");
+    
+    // Simulate agent response
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      const responses = [
+        { sender: "Nexus", content: "Processing your request. Current stock overview:\n\n📊 All 9 SKUs across 49 darkstores tracked.\n🔴 4 OOS locations\n🟡 7 low stock alerts\n🟢 System nominal." },
+        { sender: "Atlas", content: "Checking MASTER_SKU table now. Will report back shortly with any incomplete records." },
+        { sender: "Forge", content: "Task received. Running diagnostics... System is performing within normal parameters." },
+      ];
+      const response = responses[Math.floor(Math.random() * responses.length)];
+      const agentMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        sender: response.sender,
+        sender_type: "agent",
+        timestamp: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        content: response.content,
+      };
+      setMessages(prev => [...prev, agentMsg]);
+    }, 2000);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    if (e.target.value.includes("@")) {
+      setShowMentionDropdown(true);
+    } else {
+      setShowMentionDropdown(false);
+    }
+  };
+
+  const insertMention = (agentName: string) => {
+    setInput(`@${agentName.toLowerCase()} `);
+    setShowMentionDropdown(false);
+  };
+
+  const handleQuickAction = (prompt: string) => {
+    setInput(prompt);
+  };
 
   return (
     <div className="h-[calc(100vh-180px)] flex gap-4">
-      {/* Left Panel - Agent List */}
+      {/* LEFT PANEL */}
       <div className="w-[200px] bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
-        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">Agents Online</div>
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">AGENTS ONLINE</div>
         
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-800">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white">GR</div>
-            <span className="text-sm text-white">Group</span>
-          </div>
-          
-          {agents.map((agent) => (
-            <div key={agent.name} className="flex items-center gap-2 p-2 hover:bg-slate-800 rounded-lg cursor-pointer">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                agent.color === "amber" ? "bg-amber-500/20 text-amber-400" :
-                agent.color === "cyan" ? "bg-cyan-500/20 text-cyan-400" :
-                agent.color === "emerald" ? "bg-emerald-500/20 text-emerald-400" :
-                "bg-violet-500/20 text-violet-400"
-              }`}>
-                {agent.name.slice(0, 2).toUpperCase()}
-              </div>
-              <span className="text-sm text-slate-300">{agent.name}</span>
-              <div className="w-2 h-2 rounded-full bg-slate-500 ml-auto"></div>
+        {/* GROUP */}
+        <button
+          onClick={() => setSelectedAgent(null)}
+          className={`flex items-center gap-2 p-2 rounded-lg mb-2 ${
+            selectedAgent === null ? "bg-amber-500/10 border-l-2 border-amber-500" : "hover:bg-slate-800"
+          }`}
+        >
+          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white font-medium">GR</div>
+          <span className="text-sm text-white">Group</span>
+        </button>
+        
+        {/* Agents */}
+        {agents.map((agent) => (
+          <button
+            key={agent.id}
+            onClick={() => insertMention(agent.name)}
+            className={`flex items-center gap-2 p-2 rounded-lg mb-1 ${
+              selectedAgent === agent.id ? "bg-amber-500/10 border-l-2 border-amber-500" : "hover:bg-slate-800"
+            }`}
+          >
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
+              style={{ backgroundColor: `${agent.color}33`, color: agent.color, border: `2px solid ${agent.color}` }}
+            >
+              {agent.name.slice(0, 2).toUpperCase()}
             </div>
-          ))}
-        </div>
+            <span className="text-sm text-slate-300">{agent.name}</span>
+            <div className={`w-2 h-2 rounded-full ml-auto ${
+              agent.status === "ACTIVE" ? "bg-green-500" : "bg-slate-500"
+            }`} />
+          </button>
+        ))}
       </div>
 
-      {/* Center Panel - Message Feed */}
+      {/* CENTER PANEL - MESSAGE FEED */}
       <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl flex flex-col">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length > 0 ? messages.map((msg, i) => (
-            msg.type === "system" ? (
-              <div key={i} className="text-center">
-                <div className="inline-block bg-slate-700 rounded-lg px-4 py-2 text-xs text-slate-400 italic">
-                  {msg.text}
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.sender_type === "user" ? "justify-end" : msg.sender_type === "system" ? "justify-center" : "justify-start"}`}>
+              {msg.sender_type === "system" ? (
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2 text-xs text-slate-400 italic max-w-[80%] text-center">
+                  {msg.content}
+                </div>
+              ) : msg.sender_type === "user" ? (
+                <div className="max-w-[70%]">
+                  <div className="text-right mb-1">
+                    <span className="text-xs text-amber-400 font-medium">Anush</span>
+                  </div>
+                  <div className="bg-amber-900/30 border border-amber-800/50 rounded-xl rounded-tr-none px-4 py-3 text-sm text-white">
+                    {msg.content}
+                  </div>
+                  <div className="text-right mt-1">
+                    <span className="text-xs text-slate-500">{msg.timestamp}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="max-w-[70%]">
+                  {msg.badge && (
+                    <div className="flex justify-end mb-1">
+                      <span className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-400 rounded-full">
+                        {msg.badge}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-start gap-2">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium shrink-0"
+                      style={{ 
+                        backgroundColor: `${agents.find(a => a.name === msg.sender)?.color}33`, 
+                        border: `2px solid ${agents.find(a => a.name === msg.sender)?.color}` 
+                      }}
+                    >
+                      {msg.sender.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span 
+                          className="text-xs font-medium"
+                          style={{ color: agents.find(a => a.name === msg.sender)?.color }}
+                        >
+                          {msg.sender}
+                        </span>
+                      </div>
+                      <div 
+                        className={`px-4 py-3 rounded-xl rounded-tl-none text-sm text-slate-200 ${
+                          msg.badge === "📋 DAILY BRIEF" 
+                            ? "bg-slate-800 border-t-2 border-amber-500" 
+                            : "bg-slate-800"
+                        }`}
+                      >
+                        <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">{msg.timestamp}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          
+          {/* Typing Indicator */}
+          {isTyping && (
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center text-sm" style={{ border: "2px solid #06B6D4" }}>NX</div>
+              <div className="bg-slate-800 rounded-xl px-4 py-3">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0.1s]" />
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0.2s]" />
                 </div>
               </div>
-            ) : null
-          )) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-slate-500">No messages yet — agents will post here after first file upload</p>
             </div>
           )}
+          
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Bar */}
         <div className="p-4 border-t border-slate-800">
-          <div className="flex gap-2">
-            <button className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
-            </button>
-            <input
-              type="text"
-              placeholder="Message all agents or @mention one specifically..."
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
-            />
-            <button className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium">
-              Send
-            </button>
+          <div className="relative">
+            {showMentionDropdown && (
+              <div className="absolute bottom-full mb-2 left-0 w-48 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                {agents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    onClick={() => insertMention(agent.name)}
+                    className="flex items-center gap-2 w-full p-2 hover:bg-slate-700 text-left"
+                  >
+                    <div 
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px]"
+                      style={{ backgroundColor: `${agent.color}33`, color: agent.color }}
+                    >
+                      {agent.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-sm text-slate-300">{agent.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </button>
+              <input
+                type="text"
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder="Message the team or @mention a specific agent..."
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-2 9 2 9-9 2-9-2 9 2 9-9 2-9-2 9m0 0l9 2-9-2-9 2 9-2-9 2 9-2-9 2-9-2 9" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Right Panel - Quick Actions */}
-      <div className="w-[240px] bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-6">
-        <div>
+      {/* RIGHT PANEL */}
+      <div className="w-[240px] space-y-6">
+        {/* Quick Actions */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Quick Actions</div>
-          <button className="w-full text-left p-3 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300">
-            @ Mention an agent
-          </button>
+          <div className="space-y-2">
+            {quickActions.map((action, i) => (
+              <button
+                key={i}
+                onClick={() => handleQuickAction(action.prompt)}
+                className="w-full text-left p-3 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div>
+        {/* Recent Activity */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Recent Activity</div>
-          <div className="space-y-2 text-xs text-slate-500">
-            <p>—</p>
+          <div className="space-y-3">
+            {recentActivity.map((activity, i) => {
+              const agent = agents.find(a => a.name === activity.agent);
+              return (
+                <div key={i} className="flex items-start gap-2">
+                  <div className="w-2 h-2 rounded-full mt-1.5" style={{ backgroundColor: agent?.color || "#666" }} />
+                  <div>
+                    <div className="text-xs" style={{ color: agent?.color }}>{activity.agent}</div>
+                    <div className="text-xs text-slate-500">{activity.action}</div>
+                    <div className="text-[10px] text-slate-600">{activity.time}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

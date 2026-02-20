@@ -1,26 +1,22 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-export function useTasks() {
-  return useQuery(api.seed.getTasks);
+export function useMasterSku() {
+  return useQuery(api.queries.getMasterSku);
 }
 
-export function usePipelineItems() {
-  return useQuery(api.seed.getPipelineItems);
+export function useAddMasterSku() {
+  return useMutation(api.mutations.addMasterSku);
 }
 
-export function useAgents() {
-  return useQuery(api.seed.getAgents);
+export function useUpdateMasterSku() {
+  return useMutation(api.mutations.updateMasterSku);
 }
 
-export function useMemoryEntries() {
-  return useQuery(api.seed.getMemoryEntries);
+export function useBulkUpsertSku() {
+  return useMutation(api.mutations.bulkUpsertSku);
 }
 
-export function useCalendarEvents() {
-  return useQuery(api.seed.getCalendarEvents);
-}
-
-export function useMessages() {
-  return useQuery(api.seed.getMessages);
+export function useSeedData() {
+  return useMutation(api.seed.seedData);
 }

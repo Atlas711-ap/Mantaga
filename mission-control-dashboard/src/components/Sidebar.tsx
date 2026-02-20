@@ -31,9 +31,7 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
       <div className="p-6 border-b border-slate-800">
-        <h1 className="text-xl font-bold text-white">
-          MANTAGA
-        </h1>
+        <h1 className="text-xl font-bold text-white">MANTAGA</h1>
         <p className="text-xs text-slate-500 mt-1">Mission Control</p>
       </div>
 
