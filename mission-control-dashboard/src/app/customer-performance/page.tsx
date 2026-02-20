@@ -15,11 +15,8 @@ interface SkuSummary {
 interface DarkstoreData {
   darkstore: string;
   current_stock: number;
-  sold_7d: number;
-  avg_daily_rate: number;
-  last_replenishment: string;
-  days_since_replenishment: number;
-  avg_replenishment_cycle: number;
+  warehouse_type: string;
+  effective_stock: number;
   status: "OOS" | "LOW" | "HEALTHY";
 }
 
@@ -46,9 +43,17 @@ export default function CustomerPerformancePage() {
   const [view, setView] = useState<ViewMode>("sku");
   const [selectedSku, setSelectedSku] = useState<SkuSummary | null>(null);
 
-  // Transform Convex data to SKU summary format with new columns
+  // Transform Convex data to SKU summary format - join with master_sku for product names
   const skuSummary: SkuSummary[] = useMemo(() => {
-    if (!skus || !stockData) return [];
+    if (!stockData) return [];
+    
+    // Create a map of barcode -> SKU name from master_sku
+    const skuNameMap: Record<string, string> = {};
+    if (skus) {
+      skus.forEach(sku => {
+        skuNameMap[sku.barcode] = sku.sku_name;
+      });
+    }
     
     // Group stock by barcode
     const byBarcode: Record<string, typeof stockData> = {};
@@ -57,8 +62,9 @@ export default function CustomerPerformancePage() {
       byBarcode[s.barcode].push(s);
     });
     
-    return skus.map(sku => {
-      const stock = byBarcode[sku.barcode] || [];
+    return Object.entries(byBarcode).map(([barcode, stock]) => {
+      // Use master SKU name if available, otherwise use product_name from stock data
+      const productName = skuNameMap[barcode] || stock[0]?.product_name || barcode;
       
       // SOH = Total stock on hand (all darkstores + 3PL)
       const soh = stock.reduce((sum, s) => sum + (s.stock_on_hand || 0), 0);
@@ -83,14 +89,14 @@ export default function CustomerPerformancePage() {
       ).length;
       
       return {
-        barcode: sku.barcode,
-        sku_name: sku.sku_name,
+        barcode,
+        sku_name: productName,
         soh,
         threepl_stock: threeplStock,
         active_ds: activeDs,
         inactive_ds: inactiveDs,
       };
-    }).filter(sku => sku.soh > 0); // Only show SKUs with stock data
+    }).filter(sku => sku.soh >= 0);
   }, [skus, stockData]);
 
   // Get darkstore breakdown for selected SKU
@@ -102,11 +108,8 @@ export default function CustomerPerformancePage() {
       .map(s => ({
         darkstore: s.warehouse_name,
         current_stock: s.stock_on_hand || 0,
-        sold_7d: 0, // Would need sell_out_log for real data
-        avg_daily_rate: 0,
-        last_replenishment: s.report_date,
-        days_since_replenishment: 0,
-        avg_replenishment_cycle: 0,
+        warehouse_type: s.warehouse_type || (is3PLWarehouse(s.warehouse_name) ? "3PL" : "Darkstore"),
+        effective_stock: s.effective_stock || (s.stock_on_hand || 0),
         status: (s.stock_on_hand || 0) === 0 ? "OOS" as const : 
                 (s.stock_on_hand || 0) <= 3 ? "LOW" as const : "HEALTHY" as const,
       }))
