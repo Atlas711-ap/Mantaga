@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useMessages, useInsertMessage } from "../../hooks/useConvex";
 
 interface Message {
   id: string;
@@ -27,18 +28,6 @@ const agents: Agent[] = [
   { id: "forge", name: "Forge", role: "Developer", color: "#8B5CF6", status: "IDLE" },
 ];
 
-const mockMessages: Message[] = [
-  { id: "1", sender: "Forge", sender_type: "agent", timestamp: "19 Feb 2026, 07:45", badge: "⚡ SCHEDULED", content: "System health check complete — all 8 cron jobs ran successfully overnight. No errors detected. System performance nominal." },
-  { id: "2", sender: "Atlas", sender_type: "agent", timestamp: "19 Feb 2026, 08:00", badge: "⚡ SCHEDULED", content: "Barcode cross-reference complete — all barcodes in today's stock report match MASTER_SKU. No unknown SKUs detected." },
-  { id: "3", sender: "Athena", sender_type: "agent", timestamp: "19 Feb 2026, 09:00", badge: "📋 DAILY BRIEF", content: "Good morning. Here is today's operational summary:\n\n📊 Stock: 4 OOS locations, 7 low stock alerts. DS_4 Barsha 1 has been OOS for 3 consecutive days — @Nexus please flag for Talabat follow-up.\n\n💰 Finance: Last invoice (62693) matched PO3851128 at 100% service level. Commission AED 420 earned.\n\n📋 Catalogue: All 9 SKUs active. 2 SKUs missing shelf life data — @Atlas to follow up.\n\n⚙️ System: All automations running clean.\n\nAction items: Follow up on DS_4 Barsha 1 OOS situation.\n\n— Athena" },
-  { id: "4", sender: "Anush", sender_type: "user", timestamp: "19 Feb 2026, 09:15", content: "@nexus how long has DS_4 Barsha 1 been OOS for Al Mudhish Ready Salt?" },
-  { id: "5", sender: "Nexus", sender_type: "agent", timestamp: "19 Feb 2026, 09:15", content: "DS_4 Barsha 1 — Al Mudhish Chips Ready Salt 75g:\n• Current stock: 0 units\n• OOS since: 17 Feb 2026 (3 consecutive days)\n• Last replenishment: 10 Feb 2026\n• Avg replenishment cycle at this darkstore: 3.2 days\n• 3PL buffer stock: 276 units available\n\nAssessment: Overdue for replenishment. Talabat has sufficient buffer stock at 3PL to replenish. Likely a Talabat internal logistics delay." },
-  { id: "6", sender: "Anush", sender_type: "user", timestamp: "19 Feb 2026, 09:18", content: "noted, keep monitoring. also @atlas are the 2 SKUs with missing shelf life data from Mudhish or Suroor?" },
-  { id: "7", sender: "Atlas", sender_type: "agent", timestamp: "19 Feb 2026, 09:18", content: "The 2 SKUs with missing shelf life data are both from the Mudhish range:\n• Al Mudhish Chips Tortilla Pizza 100g (barcode: 09501033112049)\n• Al Mudhish Ripples Crunch Chilli 15g (barcode: 09501033112629)\n\nBoth are also missing Case Pack values. Please update these in the SKU List tab at your earliest convenience." },
-  { id: "8", sender: "system", sender_type: "system", timestamp: "19 Feb 2026, 13:02", content: "— Daily stock report uploaded by Anush (user) — queued for Nexus processing at 2:00 PM —" },
-  { id: "9", sender: "Nexus", sender_type: "agent", timestamp: "19 Feb 2026, 14:00", badge: "⚡ SCHEDULED", content: "📊 Stock Report Processed — 19 Feb 2026\n─────────────────────────\nSKUs tracked: 9\nDarkstores covered: 49\n\n🔴 OOS: 4 locations\n🟡 Low stock (≤3 units): 7 locations\n🟢 Replenishments detected: 3 locations\n\nOOS locations:\n• Al Mudhish Ready Salt 75g — DS_4 Barsha 1 (3rd consecutive day)\n• Al Mudhish Ready Salt 75g — DS_15 Khaldiya Tmart\n• Al Mudhish Rip. Cru. Chill 75g — DS_1 Business Bay\n• Suroor Chips Tomato 14g — DS_60 Sanaya\n\nReplenishments detected:\n• Al Mudhish Sour Cream 75g — DS_36 Bahia (+120 units)\n• Suroor Mexican 15g — DS_27 Al Hamidiya (+22 units)\n• Suroor Crispstix 18g — DS_21 Shamkha (+70 units)" },
-];
-
 const recentActivity = [
   { agent: "Nexus", action: "Stock report processed", time: "2h ago" },
   { agent: "Atlas", action: "SKU data validated", time: "4h ago" },
@@ -54,18 +43,36 @@ const quickActions = [
 ];
 
 export default function ChatroomPage() {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const messagesData = useMessages();
+  const insertMessage = useInsertMessage();
+  
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Sync Convex messages to local state
+  useEffect(() => {
+    if (messagesData) {
+      const formatted: Message[] = messagesData.map(m => ({
+        id: m._id,
+        sender: m.sender,
+        sender_type: m.sender_type as "agent" | "user" | "system",
+        timestamp: new Date(m.timestamp).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        content: m.content,
+        badge: m.is_system_message ? "⚙️ SYSTEM" : undefined,
+      }));
+      setMessages(formatted);
+    }
+  }, [messagesData]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
     
     const newMessage: Message = {
@@ -76,8 +83,22 @@ export default function ChatroomPage() {
       content: input,
     };
     
+    // Optimistic update
     setMessages([...messages, newMessage]);
     setInput("");
+    
+    // Save to Convex
+    try {
+      await insertMessage({
+        sender: "Anush",
+        sender_type: "user",
+        content: input,
+        timestamp: new Date().toISOString(),
+        is_system_message: false,
+      });
+    } catch (error) {
+      console.error("Failed to save message:", error);
+    }
     
     // Simulate agent response
     setIsTyping(true);
@@ -171,9 +192,6 @@ export default function ChatroomPage() {
                 <div className="max-w-[70%]">
                   <div className="text-right mb-1">
                     <span className="text-xs text-amber-400 font-medium">Anush</span>
-                  </div>
-                  <div className="bg-amber-900/30 border border-amber-800/50 rounded-xl rounded-tr-none px-4 py-3 text-sm text-white">
-                    {msg.content}
                   </div>
                   <div className="text-right mt-1">
                     <span className="text-xs text-slate-500">{msg.timestamp}</span>
@@ -283,7 +301,7 @@ export default function ChatroomPage() {
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-2 9 2 9-9 2-9-2 9 2 9-9 2-9-2 9m0 0l9 2-9-2-9 2 9-2-9 2 9-2-9 2-9-2 9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-2 9 2 9-9 2-9-2 9 2 9-9 2-9-2 9" />
                 </svg>
               </button>
             </div>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
+import { useMasterSku, useInsertMasterSku, useUpdateMasterSkuById } from "../../hooks/useConvex";
 
 type SkuRecord = {
   _id: string;
@@ -22,12 +23,6 @@ type SkuRecord = {
   client_sellin_price?: number;
   mantaga_commission_pct?: number;
 };
-
-const sampleData: SkuRecord[] = [
-  { _id: "1", client: "Quadrant International", brand: "Mudhish", barcode: "SKU-001", sku_name: "Mudhish Classic Chips", category: "Snacks", subcategory: "Chips", case_pack: 24, shelf_life: "6 months", nutrition_info: "Yes", ingredients_info: "Yes", talabat_sku: "TAL-001", noon_zsku: "NOON-001", client_sellin_price: 12.50, mantaga_commission_pct: 15 },
-  { _id: "2", client: "Quadrant International", brand: "Mudhish", barcode: "SKU-002", sku_name: "Mudhish Spicy Chips", category: "Snacks", subcategory: "Chips", case_pack: 24, shelf_life: "6 months", nutrition_info: "No", ingredients_info: "No", talabat_sku: "TAL-002", client_sellin_price: 12.50, mantaga_commission_pct: 15 },
-  { _id: "3", client: "Quadrant International", brand: "Mudhish", barcode: "SKU-003", sku_name: "Mudhish Onion Rings", case_pack: 24, shelf_life: "6 months", talabat_sku: "TAL-003", client_sellin_price: 14.00, mantaga_commission_pct: 15 },
-];
 
 const requiredFields = ["client", "brand", "barcode", "sku_name", "case_pack", "shelf_life", "talabat_sku"];
 
@@ -51,7 +46,10 @@ function isAmberRow(record: SkuRecord): { isAmber: boolean; missing: string[] } 
 }
 
 export default function SkuListPage() {
-  const [skus] = useState<SkuRecord[]>(sampleData);
+  const skusData = useMasterSku();
+  const insertSku = useInsertMasterSku();
+  const updateSku = useUpdateMasterSkuById();
+  
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("All");
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
@@ -59,6 +57,8 @@ export default function SkuListPage() {
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [formData, setFormData] = useState<Partial<SkuRecord>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const skus: SkuRecord[] = skusData || [];
 
   const brands = useMemo(() => {
     const brandSet = new Set(skus.map((s) => s.brand).filter(Boolean));
@@ -123,9 +123,34 @@ export default function SkuListPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validateForm()) return;
-    setModalOpen(false);
+    
+    try {
+      if (modalMode === "add") {
+        await insertSku({
+          client: formData.client!,
+          brand: formData.brand!,
+          barcode: formData.barcode!,
+          sku_name: formData.sku_name!,
+          category: formData.category,
+          subcategory: formData.subcategory,
+          case_pack: formData.case_pack,
+          shelf_life: formData.shelf_life,
+          nutrition_info: formData.nutrition_info,
+          ingredients_info: formData.ingredients_info,
+          amazon_asin: formData.amazon_asin,
+          talabat_sku: formData.talabat_sku,
+          noon_zsku: formData.noon_zsku,
+          careem_code: formData.careem_code,
+          client_sellin_price: formData.client_sellin_price,
+          mantaga_commission_pct: formData.mantaga_commission_pct,
+        });
+      }
+      setModalOpen(false);
+    } catch (error) {
+      console.error("Failed to save SKU:", error);
+    }
   };
 
   const handleExport = () => {

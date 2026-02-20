@@ -3,8 +3,10 @@
 import { useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import * as XLSX from "xlsx";
+import { useBrandPerformance, useInsertBrandPerformance } from "../../hooks/useConvex";
 
 interface BrandRecord {
+  _id: string;
   year: number;
   month: number;
   po_number: string;
@@ -18,16 +20,8 @@ interface BrandRecord {
   gap_value: number;
   service_level_pct: number;
   commission_aed: number;
-  match_status: "MATCHED" | "DISCREPANCY";
+  match_status: string;
 }
-
-const mockData: BrandRecord[] = [
-  { year: 2026, month: 2, po_number: "PO3851128", po_date: "12/02/2026", invoice_number: "62693", invoice_date: "14/02/2026", lpo_value_excl_vat: 4000.00, lpo_value_incl_vat: 4200.00, invoiced_value_excl_vat: 4000.00, invoiced_value_incl_vat: 4200.00, gap_value: 0.00, service_level_pct: 100, commission_aed: 420.00, match_status: "MATCHED" },
-  { year: 2026, month: 1, po_number: "PO3821045", po_date: "07/01/2026", invoice_number: "61890", invoice_date: "09/01/2026", lpo_value_excl_vat: 6000.00, lpo_value_incl_vat: 6300.00, invoiced_value_excl_vat: 5400.00, invoiced_value_incl_vat: 5670.00, gap_value: 600.00, service_level_pct: 90, commission_aed: 567.00, match_status: "DISCREPANCY" },
-  { year: 2026, month: 1, po_number: "PO3798234", po_date: "14/01/2026", invoice_number: "61945", invoice_date: "16/01/2026", lpo_value_excl_vat: 4000.00, lpo_value_incl_vat: 4200.00, invoiced_value_excl_vat: 4000.00, invoiced_value_incl_vat: 4200.00, gap_value: 0.00, service_level_pct: 100, commission_aed: 420.00, match_status: "MATCHED" },
-  { year: 2025, month: 12, po_number: "PO3754112", po_date: "03/12/2025", invoice_number: "60877", invoice_date: "05/12/2025", lpo_value_excl_vat: 8000.00, lpo_value_incl_vat: 8400.00, invoiced_value_excl_vat: 7200.00, invoiced_value_incl_vat: 7560.00, gap_value: 800.00, service_level_pct: 90, commission_aed: 756.00, match_status: "DISCREPANCY" },
-  { year: 2025, month: 11, po_number: "PO3712009", po_date: "05/11/2025", invoice_number: "60201", invoice_date: "07/11/2025", lpo_value_excl_vat: 4000.00, lpo_value_incl_vat: 4200.00, invoiced_value_excl_vat: 4000.00, invoiced_value_incl_vat: 4200.00, gap_value: 0.00, service_level_pct: 100, commission_aed: 420.00, match_status: "MATCHED" },
-];
 
 const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -42,14 +36,19 @@ function getServiceColor(pct: number): string {
 }
 
 export default function BrandPerformancePage() {
+  const brandData = useBrandPerformance();
+  const insertBrandPerf = useInsertBrandPerformance();
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
 
+  const mockData: BrandRecord[] = brandData || [];
+
   // MTD calculations (February 2026)
+  const currentDate = new Date();
   const mtdData = useMemo(() => {
-    const currentMonth = 2;
-    const currentYear = 2026;
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
     return mockData.filter(d => d.month === currentMonth && d.year === currentYear);
-  }, []);
+  }, [mockData]);
 
   const mtdStats = useMemo(() => {
     const totalInvoiced = mtdData.reduce((sum, d) => sum + d.invoiced_value_incl_vat, 0);
@@ -59,11 +58,11 @@ export default function BrandPerformancePage() {
     return { totalInvoiced, totalCommission, lpoCount, avgService };
   }, [mtdData]);
 
-  // YTD calculations (2026)
+  // YTD calculations
   const ytdData = useMemo(() => {
-    const currentYear = 2026;
+    const currentYear = currentDate.getFullYear();
     return mockData.filter(d => d.year === currentYear);
-  }, []);
+  }, [mockData]);
 
   const ytdStats = useMemo(() => {
     const totalInvoiced = ytdData.reduce((sum, d) => sum + d.invoiced_value_incl_vat, 0);
@@ -79,19 +78,20 @@ export default function BrandPerformancePage() {
       if (a.year !== b.year) {
         return sortOrder === "desc" ? b.year - a.year : a.year - b.year;
       }
-      return sortOrder === "desc" ? b.month - a.month : a.month - a.month;
+      return sortOrder === "desc" ? b.month - a.month : a.month - b.month;
     });
-  }, [sortOrder]);
+  }, [mockData, sortOrder]);
 
   // Weekly chart data
   const weeklyData = useMemo(() => {
-    return [
-      { week: "3 Feb", value: 4200 },
-      { week: "10 Feb", value: 0 },
-      { week: "17 Feb", value: 0 },
-      { week: "24 Feb", value: 0 },
-    ];
-  }, []);
+    // Group by week
+    const weeks: Record<string, number> = {};
+    mockData.forEach(d => {
+      const week = `${d.invoice_date}`;
+      weeks[week] = (weeks[week] || 0) + d.invoiced_value_incl_vat;
+    });
+    return Object.entries(weeks).map(([week, value]) => ({ week, value })).slice(0, 8);
+  }, [mockData]);
 
   // Monthly history
   const monthlyHistory = useMemo(() => {
@@ -113,7 +113,7 @@ export default function BrandPerformancePage() {
           : 0;
         return { year, month, lpoCount: records.length, totalInvoiced, avgService, totalCommission };
       });
-  }, []);
+  }, [mockData]);
 
   const handleExport = () => {
     const exportData = sortedData.map(d => ({
@@ -193,7 +193,7 @@ export default function BrandPerformancePage() {
             <div className="text-2xl font-mono text-white">{formatAED(ytdStats.totalCommission)}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total LPOs YTD</div>
+            <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">LPOs YTD</div>
             <div className="text-2xl font-mono text-white">{ytdStats.lpoCount}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -203,66 +203,9 @@ export default function BrandPerformancePage() {
         </div>
       </div>
 
-      {/* Data Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-800 sticky top-0">
-              <tr>
-                {columns.map((col) => (
-                  <th 
-                    key={col} 
-                    className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:text-white"
-                    onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                  >
-                    {col} {col === "Year" || col === "Month" ? (sortOrder === "desc" ? "↓" : "↑") : ""}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedData.length > 0 ? sortedData.map((record, i) => (
-                <tr key={i} className="border-t border-slate-800 hover:bg-slate-800/50">
-                  <td className="px-4 py-3 text-slate-300">{record.year}</td>
-                  <td className="px-4 py-3 text-slate-300">{monthNames[record.month]}</td>
-                  <td className="px-4 py-3 text-slate-300">{record.po_date}</td>
-                  <td className="px-4 py-3 text-slate-300">{record.invoice_date}</td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{record.po_number}</td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{record.invoice_number}</td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(record.lpo_value_incl_vat)}</td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(record.invoiced_value_incl_vat)}</td>
-                  <td className={`px-4 py-3 font-mono ${record.gap_value > 0 ? "text-red-400" : "text-slate-300"}`}>
-                    {formatAED(record.gap_value)}
-                  </td>
-                  <td className={`px-4 py-3 font-mono ${getServiceColor(record.service_level_pct)}`}>
-                    {record.service_level_pct}%
-                  </td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(record.commission_aed)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      record.match_status === "MATCHED" 
-                        ? "bg-emerald-500/20 text-emerald-400" 
-                        : "bg-red-500/20 text-red-400"
-                    }`}>
-                      {record.match_status === "MATCHED" ? "✅ MATCHED" : "⚠️ DISCREPANCY"}
-                    </span>
-                  </td>
-                </tr>
-              )) : (
-                <tr className="border-t border-slate-800">
-                  <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
-                    No financial data yet — upload an LPO and Invoice in the Data Upload tab
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Bar Chart */}
+      {/* Weekly Trend Chart */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">Weekly Invoiced Value — Last 8 Weeks</div>
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">Weekly Invoiced Value</div>
         {weeklyData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={weeklyData}>
@@ -287,37 +230,75 @@ export default function BrandPerformancePage() {
         )}
       </div>
 
-      {/* Monthly Service Level History */}
+      {/* Monthly History */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">Monthly History</div>
+        <div className="grid grid-cols-4 gap-4">
+          {monthlyHistory.slice(0, 4).map((record) => (
+            <div key={`${record.year}-${record.month}`} className="bg-slate-800 rounded-lg p-3">
+              <div className="text-sm text-slate-300 mb-2">{monthNames[record.month]} {record.year}</div>
+              <div className="text-lg font-mono text-white">{formatAED(record.totalInvoiced)}</div>
+              <div className="text-xs text-slate-500">{record.lpoCount} LPOs</div>
+              <div className={`text-xs ${getServiceColor(record.avgService)}`}>Avg {record.avgService.toFixed(0)}% service</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-800">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Monthly Service Level History</div>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">All Records</div>
+          <button 
+            onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+            className="text-xs text-slate-400 hover:text-slate-200"
+          >
+            Sort: {sortOrder === "desc" ? "Newest First" : "Oldest First"}
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-800">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Year</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Month</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">LPOs</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Total Invoiced (AED)</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Avg Service Level %</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Total Commission (AED)</th>
+                {columns.map((col) => (
+                  <th key={col} className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                    {col}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {monthlyHistory.length > 0 ? monthlyHistory.map((row, i) => (
-                <tr key={i} className="border-t border-slate-800 hover:bg-slate-800/50">
-                  <td className="px-4 py-3 text-slate-300">{row.year}</td>
-                  <td className="px-4 py-3 text-slate-300">{monthNames[row.month]}</td>
-                  <td className="px-4 py-3 text-slate-300">{row.lpoCount}</td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(row.totalInvoiced)}</td>
-                  <td className={`px-4 py-3 font-mono ${getServiceColor(row.avgService)}`}>{row.avgService.toFixed(0)}%</td>
-                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(row.totalCommission)}</td>
+              {sortedData.length > 0 ? sortedData.map((record) => (
+                <tr key={record._id} className="border-t border-slate-800 hover:bg-slate-800/50">
+                  <td className="px-4 py-3 text-slate-300">{record.year}</td>
+                  <td className="px-4 py-3 text-slate-300">{monthNames[record.month]}</td>
+                  <td className="px-4 py-3 text-slate-300">{record.po_date}</td>
+                  <td className="px-4 py-3 text-slate-300">{record.invoice_date}</td>
+                  <td className="px-4 py-3 text-slate-300 font-mono">{record.po_number}</td>
+                  <td className="px-4 py-3 text-slate-300 font-mono">{record.invoice_number}</td>
+                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(record.lpo_value_incl_vat)}</td>
+                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(record.invoiced_value_incl_vat)}</td>
+                  <td className={`px-4 py-3 font-mono ${record.gap_value > 0 ? "text-red-400" : "text-slate-300"}`}>
+                    {formatAED(record.gap_value)}
+                  </td>
+                  <td className={`px-4 py-3 font-mono ${getServiceColor(record.service_level_pct)}`}>
+                    {record.service_level_pct}%
+                  </td>
+                  <td className="px-4 py-3 text-slate-300 font-mono">{formatAED(record.commission_aed)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      record.match_status === "MATCHED" 
+                        ? "bg-emerald-500/20 text-emerald-400" 
+                        : "bg-red-500/20 text-red-400"
+                    }`}>
+                      {record.match_status}
+                    </span>
+                  </td>
                 </tr>
               )) : (
                 <tr className="border-t border-slate-800">
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                    No historical data yet
+                  <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
+                    No brand performance data yet — upload invoices to populate this table
                   </td>
                 </tr>
               )}

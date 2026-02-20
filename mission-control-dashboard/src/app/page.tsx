@@ -1,4 +1,12 @@
+"use client";
+
+import { useAgentEventLog, useInsertAgentEventLog } from "../hooks/useConvex";
+
 export default function DashboardPage() {
+  const events = useAgentEventLog();
+  const insertEvent = useInsertAgentEventLog();
+  
+  // Transform events into alerts
   const alerts = [
     { type: "OUT OF STOCK", message: "SKU-003 at Jumeirah Village Circle darkstore", time: "14:32", color: "red" },
     { type: "LOW STOCK", message: "SKU-007 below reorder threshold at 5 darkstores", time: "14:15", color: "amber" },

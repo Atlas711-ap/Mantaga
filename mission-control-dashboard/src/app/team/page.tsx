@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAgentEventLog, useRecentAgentEvents } from "../../hooks/useConvex";
 
 interface Agent {
   id: string;
@@ -60,161 +61,164 @@ function AgentCard({ agent, onHover, position }: { agent: Agent; onHover: (a: Ag
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
             {agent.primary_model}
           </span>
-          <div className="flex items-center gap-1">
-            <div className={`w-2 h-2 rounded-full ${agent.status === "ACTIVE" ? "bg-green-500" : agent.status === "IDLE" ? "bg-slate-500" : "bg-red-500"}`} />
-            <span className="text-[10px] text-slate-400">{agent.status}</span>
-          </div>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+            agent.status === "ACTIVE" ? "bg-green-500/20 text-green-400" :
+            agent.status === "IDLE" ? "bg-amber-500/20 text-amber-400" :
+            "bg-red-500/20 text-red-400"
+          }`}>
+            {agent.status}
+          </span>
         </div>
       </div>
-
-      {isHovered && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[280px] bg-slate-800 border border-slate-700 rounded-lg p-3 z-50">
-          <div className="text-white font-medium text-sm mb-1">{agent.name} — {agent.role}</div>
-          <div className="text-slate-400 text-xs mb-2">Model: {agent.primary_model}</div>
-          <div className="text-slate-300 text-xs border-t border-slate-700 pt-2">
-            <span className="text-slate-500">Last action:</span> {agent.last_action}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 export default function TeamPage() {
+  const agentEvents = useAgentEventLog();
+  const recentEvents = useRecentAgentEvents(10);
   const [hoveredAgent, setHoveredAgent] = useState<Agent | null>(null);
-  
-  const athena = mockAgents.find(a => a.id === "athena")!;
-  const reports = mockAgents.filter(a => a.id !== "athena");
+
+  // Get last action from events if available
+  const getLastAction = (agentName: string): string => {
+    if (!recentEvents) return "No recent activity";
+    const agentEvent = recentEvents.find(e => e.agent.toLowerCase() === agentName.toLowerCase());
+    if (!agentEvent) return "No recent activity";
+    const date = new Date(agentEvent.timestamp);
+    return `${agentEvent.description} — ${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  };
 
   return (
-    <div className="space-y-6 relative h-[600px]">
-      <div>
-        <span className="bg-amber-900/20 border border-amber-800 text-amber-400 text-xs px-3 py-1 rounded-full">
-          PHASE 1 — TALABAT OPERATIONS
-        </span>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Team Overview</div>
       </div>
 
-      <div className="relative w-full h-full">
-        {/* SVG Lines Layer */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-          {/* Vertical line from Athena down */}
-          <line x1="440" y1="140" x2="440" y2="200" stroke="#475569" strokeWidth="1.5" />
-          
-          {/* Horizontal line */}
-          <line x1="220" y1="200" x2="660" y2="200" stroke="#475569" strokeWidth="1.5" />
-          
-          {/* Arrow to Nexus */}
-          <line x1="220" y1="200" x2="220" y2="210" stroke="#475569" strokeWidth="1.5" />
-          <polygon points="220,215 215,207 225,207" fill="#475569" />
-          
-          {/* Arrow to Atlas */}
-          <line x1="440" y1="200" x2="440" y2="210" stroke="#475569" strokeWidth="1.5" />
-          <polygon points="440,215 435,207 445,207" fill="#475569" />
-          
-          {/* Arrow to Forge */}
-          <line x1="660" y1="200" x2="660" y2="210" stroke="#475569" strokeWidth="1.5" />
-          <polygon points="660,215 655,207 665,207" fill="#475569" />
-        </svg>
-
-        {/* Athena at top center */}
-        <div className="absolute" style={{ top: 20, left: 330 }}>
-          <div 
-            className="w-[220px] h-[120px] bg-slate-900 rounded-xl flex flex-col items-center justify-center p-3 cursor-pointer transition-all"
-            style={{ border: `1.5px solid ${athena.color}`, boxShadow: `0 0 12px ${athena.color}33` }}
-            onMouseEnter={() => setHoveredAgent(athena)}
-            onMouseLeave={() => setHoveredAgent(null)}
-          >
-            <div 
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm mb-2"
-              style={{ backgroundColor: `${athena.color}33`, border: `2px solid ${athena.color}` }}
-            >
-              {athena.name.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="text-white font-semibold text-base">{athena.name}</div>
-            <div className="text-slate-400 text-sm">{athena.role}</div>
-            <div className="flex items-center justify-between w-full mt-auto">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                {athena.primary_model}
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-[10px] text-slate-400">{athena.status}</span>
-              </div>
-            </div>
+      {/* Agent Cards Grid */}
+      <div className="relative h-[400px] bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        {/* Central logo/brand area */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="w-32 h-32 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+            <span className="text-4xl">🎯</span>
           </div>
-
-          {hoveredAgent?.id === "athena" && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[280px] bg-slate-800 border border-slate-700 rounded-lg p-3 z-50">
-              <div className="text-white font-medium text-sm mb-1">{athena.name} — {athena.role}</div>
-              <div className="text-slate-400 text-xs mb-2">Model: {athena.primary_model}</div>
-              <div className="text-slate-300 text-xs border-t border-slate-700 pt-2">
-                <span className="text-slate-500">Last action:</span> {athena.last_action}
-              </div>
-            </div>
-          )}
+          <div className="text-center mt-2 text-slate-500 text-xs">Mantaga</div>
         </div>
 
-        {/* Three reports below */}
-        {reports.map((agent, idx) => (
-          <div 
-            key={agent.id} 
-            className="absolute"
-            style={{ top: 220, left: idx === 0 ? 110 : idx === 1 ? 330 : 550 }}
-            onMouseEnter={() => setHoveredAgent(agent)}
-            onMouseLeave={() => setHoveredAgent(null)}
-          >
+        {/* Top Agent */}
+        <AgentCard 
+          agent={mockAgents[0]} 
+          onHover={setHoveredAgent} 
+          position="top" 
+        />
+
+        {/* Bottom Left */}
+        <AgentCard 
+          agent={mockAgents[1]} 
+          onHover={setHoveredAgent} 
+          position="bottom-left" 
+        />
+
+        {/* Bottom Center */}
+        <AgentCard 
+          agent={mockAgents[2]} 
+          onHover={setHoveredAgent} 
+          position="bottom-center" 
+        />
+
+        {/* Bottom Right */}
+        <AgentCard 
+          agent={mockAgents[3]} 
+          onHover={setHoveredAgent} 
+          position="bottom-right" 
+        />
+      </div>
+
+      {/* Hover Detail Panel */}
+      {hoveredAgent && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="flex items-center gap-4 mb-4">
             <div 
-              className="w-[220px] h-[120px] bg-slate-900 rounded-xl flex flex-col items-center justify-center p-3 cursor-pointer transition-all"
-              style={{ 
-                border: `1.5px solid ${agent.color}`,
-                boxShadow: `0 0 12px ${agent.color}33`
-              }}
+              className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold"
+              style={{ backgroundColor: `${hoveredAgent.color}33`, border: `2px solid ${hoveredAgent.color}`, color: hoveredAgent.color }}
             >
-              <div 
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm mb-2"
-                style={{ backgroundColor: `${agent.color}33`, border: `2px solid ${agent.color}` }}
-              >
-                {agent.name.slice(0, 2).toUpperCase()}
-              </div>
-              <div className="text-white font-semibold text-base">{agent.name}</div>
-              <div className="text-slate-400 text-sm">{agent.role}</div>
-              <div className="flex items-center justify-between w-full mt-auto">
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                  {agent.primary_model}
-                </span>
-                <div className="flex items-center gap-1">
-                  <div className={`w-2 h-2 rounded-full ${agent.status === "ACTIVE" ? "bg-green-500" : agent.status === "IDLE" ? "bg-slate-500" : "bg-red-500"}`} />
-                  <span className="text-[10px] text-slate-400">{agent.status}</span>
-                </div>
+              {hoveredAgent.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="text-white font-semibold text-lg">{hoveredAgent.name}</div>
+              <div className="text-slate-400 text-sm">{hoveredAgent.role}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Status</div>
+              <div className={`text-sm ${
+                hoveredAgent.status === "ACTIVE" ? "text-green-400" :
+                hoveredAgent.status === "IDLE" ? "text-amber-400" : "text-red-400"
+              }`}>
+                {hoveredAgent.status}
               </div>
             </div>
-
-            {hoveredAgent?.id === agent.id && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[280px] bg-slate-800 border border-slate-700 rounded-lg p-3 z-50">
-                <div className="text-white font-medium text-sm mb-1">{agent.name} — {agent.role}</div>
-                <div className="text-slate-400 text-xs mb-2">Model: {agent.primary_model}</div>
-                <div className="text-slate-300 text-xs border-t border-slate-700 pt-2">
-                  <span className="text-slate-500">Last action:</span> {agent.last_action}
-                </div>
-              </div>
-            )}
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Model</div>
+              <div className="text-sm text-white">{hoveredAgent.primary_model}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Last Action</div>
+              <div className="text-sm text-white truncate">{getLastAction(hoveredAgent.name)}</div>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Cron Schedule */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mt-[280px]">
-        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Cron Schedule</div>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
-          {CRON_SCHEDULE.slice(0, 6).map((cron, i) => (
-            <div key={i} className="bg-slate-800 rounded p-2">
-              <div className="text-amber-400 font-medium">{cron.time}</div>
-              <div className="text-slate-400 truncate">{cron.agent}</div>
-              <div className="text-slate-500 truncate">{cron.task}</div>
-            </div>
-          ))}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">Scheduled Tasks</div>
+        <div className="space-y-2">
+          {CRON_SCHEDULE.map((task, i) => {
+            const agent = mockAgents.find(a => a.name === task.agent);
+            return (
+              <div key={i} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 font-mono w-20">{task.time}</span>
+                  <span 
+                    className="text-sm font-medium"
+                    style={{ color: agent?.color }}
+                  >
+                    {task.agent}
+                  </span>
+                </div>
+                <span className="text-sm text-slate-300">{task.task}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
+
+      {/* Recent Events from Convex */}
+      {recentEvents && recentEvents.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">Recent Agent Events (Live)</div>
+          <div className="space-y-2">
+            {recentEvents.slice(0, 5).map((event) => {
+              const agent = mockAgents.find(a => a.name.toLowerCase() === event.agent.toLowerCase());
+              return (
+                <div key={event._id} className="flex items-center gap-3 p-2 bg-slate-800 rounded-lg">
+                  <div 
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: agent?.color || "#666" }}
+                  />
+                  <span className="text-xs text-slate-400 w-20">{event.agent}</span>
+                  <span className="text-xs text-slate-500 w-24">{event.event_type}</span>
+                  <span className="text-sm text-slate-300 flex-1 truncate">{event.description}</span>
+                  <span className="text-xs text-slate-500">
+                    {new Date(event.timestamp).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
