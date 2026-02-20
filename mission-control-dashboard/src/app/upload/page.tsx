@@ -181,11 +181,32 @@ export default function DataUploadPage() {
               }
             }
 
-            const oosCount = validWarehouses.filter((r: any) => {
+            // Calculate metrics
+            const threePlStock = validWarehouses
+              .filter((r: any) => (r.warehouse_name || r.warehouse || "").toLowerCase().includes("3pl"))
+              .reduce((sum: number, r: any) => {
+                const stock = parseInt(r.stock_on_hand || r.stock || "0");
+                const reserved = parseInt(r.putaway_reserved || r.reserved || "0");
+                return sum + (stock - reserved);
+              }, 0);
+
+            const darkstores = validWarehouses.filter((r: any) => 
+              !(r.warehouse_name || r.warehouse || "").toLowerCase().includes("3pl")
+            );
+            
+            const darkstoresWithStock = darkstores.filter((r: any) => {
+              const stock = parseInt(r.stock_on_hand || r.stock || "0");
+              const reserved = parseInt(r.putaway_reserved || r.reserved || "0");
+              return (stock - reserved) > 0;
+            }).length;
+
+            const darkstoresOOS = darkstores.filter((r: any) => {
               const stock = parseInt(r.stock_on_hand || r.stock || "0");
               const reserved = parseInt(r.putaway_reserved || r.reserved || "0");
               return (stock - reserved) <= 0;
             }).length;
+
+            const uniqueSkus = new Set(validWarehouses.map((r: any) => r.barcode || r.sku_barcode || r.product_barcode)).size;
 
             const lowStockCount = validWarehouses.filter((r: any) => {
               const stock = parseInt(r.stock_on_hand || r.stock || "0");
@@ -199,12 +220,14 @@ export default function DataUploadPage() {
               message: `📊 STOCK REPORT PROCESSED — ${new Date(reportDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
 
 ────────────────────────────────────────
-SKUs tracked: ${inserted + updated + skipped}
-Warehouses covered: ${validWarehouses.length}
-🔴 Out of stock: ${oosCount} locations
+📦 3PL Buffer Stock: ${threePlStock.toLocaleString()} units
+🏪 Darkstores with Stock: ${darkstoresWithStock}
+🏪 Darkstores OOS: ${darkstoresOOS}
+📋 Unique SKUs: ${uniqueSkus}
+
+🔴 Out of stock: ${darkstoresOOS} locations
 🟡 Low stock (≤3 units): ${lowStockCount} locations
-🟢 New records inserted: ${inserted}
-🔄 Records updated: ${updated}
+🟢 New records: ${inserted} | Updated: ${updated}
 ⚠️ Errors: ${skipped}`,
               recordsProcessed: inserted + updated,
             });
