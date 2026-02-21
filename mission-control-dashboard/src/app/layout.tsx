@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "../components/Sidebar";
 import ConvexClientProvider from "../components/ConvexClientProvider";
+import { AuthProvider } from "../components/AuthProvider";
 
 export const metadata: Metadata = {
   title: "Mantaga Mission Control",
@@ -16,7 +17,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <ConvexClientProvider>
+        <AuthProvider>
+          <ConvexClientProvider>
           <div className="flex min-h-screen">
             {/* Desktop Sidebar - hidden on mobile */}
             <div className="hidden lg:block">
@@ -42,6 +44,7 @@ export default function RootLayout({
             </main>
           </div>
         </ConvexClientProvider>
+        </AuthProvider>
       </body>
     </html>
   );
