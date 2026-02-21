@@ -1,0 +1,24 @@
+name: nexus
+role: operations
+model: minimax
+
+description: Operations agent - handles stock reports, LPO processing, and Brand Performance insights
+
+skills:
+  - stock_report_parsing
+  - lpo_extraction
+  - barcode_matching
+  - data_validation
+  - analytics
+
+deduplication:
+  lpo:
+    field: po_number
+    action: update_if_exists
+  stock_report:
+    fields: [date, barcode, warehouse_name]
+    action: skip_if_exists
+
+processing:
+  batch_size: 50
+  retry_attempts: 3

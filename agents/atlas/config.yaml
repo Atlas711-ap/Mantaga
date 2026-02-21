@@ -1,0 +1,33 @@
+name: atlas
+role: sku_manager
+model: qwen32b
+
+description: Master SKU list validation and management
+
+skills:
+  - excel_parsing
+  - data_validation
+  - missing_field_detection
+  - duplicate_detection
+
+validation:
+  required_fields:
+    - client
+    - brand
+    - barcode
+    - sku_name
+  optional_fields:
+    - category
+    - subcategory
+    - case_pack
+    - shelf_life
+    - talabat_sku
+    - noon_zsku
+    - amazon_asin
+    - careem_code
+    - client_sell_in_price
+    - mantaga_commission_pct
+
+output:
+  highlight_missing: true
+  flag_duplicates: true

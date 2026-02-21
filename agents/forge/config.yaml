@@ -1,0 +1,20 @@
+name: forge
+role: developer
+model: qwen32b
+
+description: Developer agent - builds tools and code for other agents
+
+skills:
+  - convex_functions
+  - frontend_modifications
+  - api_integrations
+  - schema_changes
+
+capabilities:
+  can_modify:
+    - convex_functions
+    - frontend_components
+    - api_routes
+  requires_approval_for:
+    - production_deployments
+    - schema_migrations
