@@ -108,9 +108,9 @@ export default function ChatroomPage() {
     setIsTyping(true);
     
     // Get knowledge base content
-    const kbContent = knowledgeBaseData 
+    const kbContent = knowledgeBaseData && knowledgeBaseData.length > 0
       ? knowledgeBaseData.map(k => `${k.key}: ${k.value}`).join("\n")
-      : "No knowledge base data yet.";
+      : "Knowledge base is empty. This is a new system.";
     
     // Detect which agent to route to
     const agentId = detectAgentMention(input);
