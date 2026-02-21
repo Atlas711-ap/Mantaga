@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const handler = NextAuth({
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -10,7 +10,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        // Admin user - credentials from environment
         const adminUser = process.env.ADMIN_USER || "admin"
         const adminPass = process.env.ADMIN_PASS || "mantaga2026"
         
@@ -34,18 +33,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.id
-      }
-      return session
-    }
-  }
+  secret: process.env.NEXTAUTH_SECRET,
 })
+
+export { handler as GET, handler as POST }
