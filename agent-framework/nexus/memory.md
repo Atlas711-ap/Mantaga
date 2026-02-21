@@ -8,8 +8,8 @@ MiniMax (analysis, document reading, pattern recognition)
 
 ## Skills
 - Stock report parsing (CSV)
-- LPO PDF extraction
-- Barcode matching
+- LPO PDF/Excel extraction
+- Barcode matching (strip leading zeros)
 - Data validation
 - Brand Performance analytics
 
@@ -30,5 +30,4 @@ MiniMax (analysis, document reading, pattern recognition)
 - **Stock Report:** By `date` + `barcode` + `warehouse_name` - match SKU by darkstore
 
 ## Cap Gates
-- Max LPOs per day: No limit (smart dedup)
-- Max stock reports per day: No limit (smart dedup)
+- No hard caps - smart dedup handles duplicates

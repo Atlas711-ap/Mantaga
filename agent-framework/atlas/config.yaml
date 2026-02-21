@@ -1,3 +1,4 @@
+# Atlas Config
 name: atlas
 role: sku_manager
 model: qwen32b
