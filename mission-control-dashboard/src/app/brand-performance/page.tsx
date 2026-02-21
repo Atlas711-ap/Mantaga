@@ -13,6 +13,9 @@ interface BrandRecord {
   month: number;
   po_number: string;
   po_date: string;
+  customer: string;
+  brand?: string;
+  client?: string;
   invoice_number: string;
   invoice_date: string;
   lpo_value_excl_vat: number;
@@ -178,6 +181,9 @@ export default function BrandPerformancePage() {
         month: selectedLpo.month,
         po_number: selectedLpo.po_number,
         po_date: selectedLpo.po_date,
+        customer: selectedLpo.customer || "Talabat",
+        brand: selectedLpo.brand,
+        client: selectedLpo.client,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         lpo_value_excl_vat: selectedLpo.lpo_value_excl_vat,
