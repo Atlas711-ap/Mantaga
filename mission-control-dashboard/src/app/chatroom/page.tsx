@@ -3,7 +3,8 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useRef, useEffect } from "react";
-import { useMessages, useInsertMessage } from "../../hooks/useConvex";
+import { useMessages, useInsertMessage, useKnowledgeBase } from "../../hooks/useConvex";
+import { detectAgentMention, routeToAgent } from "../../lib/agent-response";
 
 interface Message {
   id: string;
@@ -47,6 +48,7 @@ const quickActions = [
 export default function ChatroomPage() {
   const messagesData = useMessages();
   const insertMessage = useInsertMessage();
+  const knowledgeBaseData = useKnowledgeBase();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -102,25 +104,44 @@ export default function ChatroomPage() {
       console.error("Failed to save message:", error);
     }
     
-    // Simulate agent response
+    // Simulate agent response using real agent system
     setIsTyping(true);
-    setTimeout(() => {
+    
+    // Get knowledge base content
+    const kbContent = knowledgeBaseData 
+      ? knowledgeBaseData.map(k => `${k.key}: ${k.value}`).join("\n")
+      : "No knowledge base data yet.";
+    
+    // Detect which agent to route to
+    const agentId = detectAgentMention(input);
+    
+    if (agentId) {
+      // Route to specific agent
+      const response = await routeToAgent(input, agentId, kbContent);
       setIsTyping(false);
-      const responses = [
-        { sender: "Nexus", content: "Processing your request. Current stock overview:\n\n📊 All 9 SKUs across 49 darkstores tracked.\n🔴 4 OOS locations\n🟡 7 low stock alerts\n🟢 System nominal." },
-        { sender: "Atlas", content: "Checking MASTER_SKU table now. Will report back shortly with any incomplete records." },
-        { sender: "Forge", content: "Task received. Running diagnostics... System is performing within normal parameters." },
-      ];
-      const response = responses[Math.floor(Math.random() * responses.length)];
       const agentMsg: Message = {
         id: (Date.now() + 1).toString(),
-        sender: response.sender,
+        sender: agentId.charAt(0).toUpperCase() + agentId.slice(1),
         sender_type: "agent",
         timestamp: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
-        content: response.content,
+        content: response,
       };
       setMessages(prev => [...prev, agentMsg]);
-    }, 2000);
+    } else {
+      // No @mention - respond from Nexus as default
+      setTimeout(async () => {
+        const response = await routeToAgent(input, "nexus", kbContent);
+        setIsTyping(false);
+        const agentMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          sender: "Nexus",
+          sender_type: "agent",
+          timestamp: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+          content: response,
+        };
+        setMessages(prev => [...prev, agentMsg]);
+      }, 1500);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
