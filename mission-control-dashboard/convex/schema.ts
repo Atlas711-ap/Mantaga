@@ -159,4 +159,11 @@ export default defineSchema({
     notes: v.optional(v.string()),
     created_by: v.string(),
   }).index("by_date", ["event_date"]),
+
+  knowledge_base: defineTable({
+    key: v.string(),
+    value: v.string(),
+    updated_by: v.string(),
+    updated_at: v.string(),
+  }).index("by_key", ["key"]),
 });

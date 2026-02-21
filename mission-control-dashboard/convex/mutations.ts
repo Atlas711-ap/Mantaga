@@ -593,3 +593,36 @@ export const processInvoiceWithLpoMatch = mutation({
     };
   },
 });
+
+// ============ KNOWLEDGE_BASE ============
+
+export const updateKnowledgeBase = mutation({
+  args: {
+    key: v.string(),
+    value: v.string(),
+    updated_by: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("knowledge_base")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .first();
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: args.value,
+        updated_by: args.updated_by,
+        updated_at: new Date().toISOString(),
+      });
+      return { action: "updated", id: existing._id };
+    }
+    
+    const id = await ctx.db.insert("knowledge_base", {
+      key: args.key,
+      value: args.value,
+      updated_by: args.updated_by,
+      updated_at: new Date().toISOString(),
+    });
+    return { action: "inserted", id };
+  },
+});

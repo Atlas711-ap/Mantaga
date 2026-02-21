@@ -197,3 +197,16 @@ export function useInsertCalendarEvent() {
 export function useDeleteCalendarEvent() {
   return useMutation(api.mutations.deleteCalendarEvent);
 }
+
+// Knowledge Base
+export function useKnowledgeBase() {
+  return useQuery(api.queries.getKnowledgeBase);
+}
+
+export function useKnowledgeBaseByKey(key: string) {
+  return useQuery(api.queries.getKnowledgeBaseByKey, { key });
+}
+
+export function useUpdateKnowledgeBase() {
+  return useMutation(api.mutations.updateKnowledgeBase);
+}
