@@ -379,6 +379,9 @@ export const insertBrandPerformance = mutation({
     month: v.number(),
     po_number: v.string(),
     po_date: v.string(),
+    customer: v.string(),
+    brand: v.optional(v.string()),
+    client: v.optional(v.string()),
     invoice_number: v.string(),
     invoice_date: v.string(),
     lpo_value_excl_vat: v.number(),
@@ -391,6 +394,17 @@ export const insertBrandPerformance = mutation({
     match_status: v.string(),
   },
   handler: async (ctx, args) => {
+    // Check if already exists for this PO
+    const existing = await ctx.db
+      .query("brand_performance")
+      .filter((q) => q.eq(q.field("po_number"), args.po_number))
+      .first();
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, args);
+      return { action: "updated", id: existing._id };
+    }
+    
     return await ctx.db.insert("brand_performance", args);
   },
 });
@@ -537,6 +551,11 @@ export const processInvoiceWithLpoMatch = mutation({
       .withIndex("by_po_number", (q) => q.eq("po_number", args.po_number))
       .first();
 
+    // Get brand/client from line items
+    const firstLineItem = lpoLineItems[0];
+    const brand = firstLineItem?.brand;
+    const client = firstLineItem?.client;
+
     const lpoValueExclVat = lpoHeader?.total_excl_vat || args.subtotal;
     const lpoValueInclVat = lpoHeader?.total_incl_vat || args.grand_total;
 
@@ -547,6 +566,9 @@ export const processInvoiceWithLpoMatch = mutation({
       month: now.getMonth() + 1,
       po_number: args.po_number,
       po_date: lpoHeader?.order_date || args.invoice_date,
+      customer: args.customer,
+      brand: lpoHeader?.brand,
+      client: lpoHeader?.client,
       invoice_number: args.invoice_number,
       invoice_date: args.invoice_date,
       lpo_value_excl_vat: lpoValueExclVat,
