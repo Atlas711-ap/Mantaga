@@ -367,7 +367,7 @@ export const getCalendarEventsByDate = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("calendar_events")
-      .withIndex("by_date", q.eq("event_date", args.event_date))
+      .withIndex("by_date", (q) => q.eq("event_date", args.event_date))
       .collect();
   },
 });
