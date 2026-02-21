@@ -120,6 +120,9 @@ export default defineSchema({
     month: v.number(),
     po_number: v.string(),
     po_date: v.string(),
+    customer: v.string(),
+    brand: v.optional(v.string()),
+    client: v.optional(v.string()),
     invoice_number: v.string(),
     invoice_date: v.string(),
     lpo_value_excl_vat: v.number(),
@@ -130,7 +133,7 @@ export default defineSchema({
     service_level_pct: v.number(),
     commission_aed: v.number(),
     match_status: v.string(),
-  }).index("by_year_month", ["year", "month"]),
+  }).index("by_year_month", ["year", "month"]).index("by_brand", ["brand"]).index("by_customer", ["customer"]),
 
   agent_event_log: defineTable({
     agent: v.string(),

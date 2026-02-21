@@ -219,10 +219,10 @@ export const getBrandPerformanceWithFilters = query({
       results = results.filter(r => r.month === args.month);
     }
     if (args.brand) {
-      results = results.filter(r => r.brand === args.brand);
+      results = results.filter(r => r.brand && r.brand === args.brand);
     }
     if (args.customer) {
-      results = results.filter(r => r.customer === args.customer);
+      results = results.filter(r => r.customer && r.customer === args.customer);
     }
     
     return results;
