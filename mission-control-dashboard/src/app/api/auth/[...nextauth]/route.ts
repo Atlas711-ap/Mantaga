@@ -13,10 +13,10 @@ const handler = NextAuth({
         const adminUser = "Admin"
         const adminPass = "Mantaga@S2025"
         
-        if (
-          credentials?.username === adminUser &&
-          credentials?.password === adminPass
-        ) {
+        const inputUser = credentials?.username?.trim()
+        const inputPass = credentials?.password?.trim()
+        
+        if (inputUser === adminUser && inputPass === adminPass) {
           return {
             id: "1",
             name: "Admin",

@@ -26,7 +26,7 @@ export default function SignInPage() {
     });
 
     if (result?.error) {
-      setError("Invalid username or password");
+      setError(`Invalid username or password. Entered: "${username}"`);
       setLoading(false);
     } else {
       router.push("/");
