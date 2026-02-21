@@ -202,6 +202,116 @@ export const getBrandPerformanceByYearMonth = query({
   },
 });
 
+export const getBrandPerformanceWithFilters = query({
+  args: {
+    year: v.optional(v.number()),
+    month: v.optional(v.number()),
+    brand: v.optional(v.string()),
+    customer: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let results = await ctx.db.query("brand_performance").collect();
+    
+    if (args.year) {
+      results = results.filter(r => r.year === args.year);
+    }
+    if (args.month) {
+      results = results.filter(r => r.month === args.month);
+    }
+    if (args.brand) {
+      results = results.filter(r => r.brand === args.brand);
+    }
+    if (args.customer) {
+      results = results.filter(r => r.customer === args.customer);
+    }
+    
+    return results;
+  },
+});
+
+export const getBrandPerformanceMTD = query({
+  handler: async (ctx) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    
+    const results = await ctx.db
+      .query("brand_performance")
+      .withIndex("by_year_month", (q) => 
+        q.eq("year", year).eq("month", month))
+      .collect();
+    
+    // Aggregate metrics
+    const metrics = results.reduce((acc, r) => ({
+      total_po_value: acc.total_po_value + (r.lpo_value_incl_vat || 0),
+      total_sales: acc.total_sales + (r.invoiced_value_incl_vat || 0),
+      total_gap: acc.total_gap + (r.gap_value || 0),
+      total_commission: acc.total_commission + (r.commission_aed || 0),
+      count: acc.count + 1,
+    }), { total_po_value: 0, total_sales: 0, total_gap: 0, total_commission: 0, count: 0 });
+    
+    // Calculate weighted average service level
+    const totalOrdered = results.reduce((sum, r) => sum + (r.lpo_value_incl_vat || 0), 0);
+    const totalInvoiced = results.reduce((sum, r) => sum + (r.invoiced_value_incl_vat || 0), 0);
+    const serviceLevel = totalOrdered > 0 ? (totalInvoiced / totalOrdered) * 100 : 0;
+    
+    return {
+      year,
+      month,
+      ...metrics,
+      service_level_pct: Math.round(serviceLevel * 100) / 100,
+    };
+  },
+});
+
+export const getBrandPerformanceYTD = query({
+  handler: async (ctx) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    
+    const all = await ctx.db.query("brand_performance").collect();
+    const results = all.filter(r => r.year === year);
+    
+    // Aggregate metrics
+    const metrics = results.reduce((acc, r) => ({
+      total_po_value: acc.total_po_value + (r.lpo_value_incl_vat || 0),
+      total_sales: acc.total_sales + (r.invoiced_value_incl_vat || 0),
+      total_gap: acc.total_gap + (r.gap_value || 0),
+      total_commission: acc.total_commission + (r.commission_aed || 0),
+      count: acc.count + 1,
+    }), { total_po_value: 0, total_sales: 0, total_gap: 0, total_commission: 0, count: 0 });
+    
+    // Calculate weighted average service level
+    const totalOrdered = results.reduce((sum, r) => sum + (r.lpo_value_incl_vat || 0), 0);
+    const totalInvoiced = results.reduce((sum, r) => sum + (r.invoiced_value_incl_vat || 0), 0);
+    const serviceLevel = totalOrdered > 0 ? (totalInvoiced / totalOrdered) * 100 : 0;
+    
+    return {
+      year,
+      ...metrics,
+      service_level_pct: Math.round(serviceLevel * 100) / 100,
+    };
+  },
+});
+
+// Get unique brands from LPO
+export const getUniqueBrands = query({
+  handler: async (ctx) => {
+    const all = await ctx.db.query("lpo_line_items").collect();
+    const brands = [...new Set(all.map(r => r.brand).filter(Boolean))];
+    return brands.sort();
+  },
+});
+
+// Get unique customers from LPO
+export const getUniqueCustomers = query({
+  handler: async (ctx) => {
+    const all = await ctx.db.query("lpo_table").collect();
+    const customers = [...new Set(all.map(r => r.customer).filter(Boolean))];
+    return customers.sort();
+  },
+});
+
 // ============ AGENT_EVENT_LOG ============
 
 export const getAgentEventLog = query({

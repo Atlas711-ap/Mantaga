@@ -66,22 +66,31 @@ export default defineSchema({
     delivery_date: v.string(),
     supplier: v.string(),
     delivery_location: v.string(),
+    customer: v.string(), // Talabat, Noon, Amazon, etc.
+    brand: v.optional(v.string()),
+    client: v.optional(v.string()),
     total_excl_vat: v.number(),
     total_vat: v.number(),
     total_incl_vat: v.number(),
-  }).index("by_po_number", ["po_number"]),
+    status: v.optional(v.string()), // pending, partial, complete
+  }).index("by_po_number", ["po_number"]).index("by_brand", ["brand"]).index("by_customer", ["customer"]),
 
   lpo_line_items: defineTable({
     po_number: v.string(),
     barcode: v.string(),
     product_name: v.string(),
+    brand: v.optional(v.string()),
+    client: v.optional(v.string()),
     quantity_ordered: v.number(),
+    quantity_delivered: v.optional(v.number()),
     unit_cost: v.number(),
     amount_excl_vat: v.number(),
     vat_pct: v.number(),
     vat_amount: v.number(),
     amount_incl_vat: v.number(),
-  }).index("by_po_number", ["po_number"]),
+    invoice_number: v.optional(v.string()),
+    invoice_date: v.optional(v.string()),
+  }).index("by_po_number", ["po_number"]).index("by_barcode", ["barcode"]),
 
   invoice_table: defineTable({
     invoice_number: v.string(),

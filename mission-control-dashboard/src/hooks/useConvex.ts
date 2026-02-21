@@ -87,6 +87,10 @@ export function useInsertLpoLineItems() {
   return useMutation(api.mutations.insertLpoLineItems);
 }
 
+export function useUpdateLpoLineItemDelivery() {
+  return useMutation(api.mutations.updateLpoLineItemDelivery);
+}
+
 // Invoice Table
 export function useInvoiceTable() {
   return useQuery(api.queries.getInvoiceTable);
@@ -120,6 +124,31 @@ export function useBrandPerformance() {
 
 export function useBrandPerformanceByYearMonth(year: number, month: number) {
   return useQuery(api.queries.getBrandPerformanceByYearMonth, { year, month });
+}
+
+export function useBrandPerformanceWithFilters(filters: {
+  year?: number;
+  month?: number;
+  brand?: string;
+  customer?: string;
+}) {
+  return useQuery(api.queries.getBrandPerformanceWithFilters, filters);
+}
+
+export function useBrandPerformanceMTD() {
+  return useQuery(api.queries.getBrandPerformanceMTD);
+}
+
+export function useBrandPerformanceYTD() {
+  return useQuery(api.queries.getBrandPerformanceYTD);
+}
+
+export function useUniqueBrands() {
+  return useQuery(api.queries.getUniqueBrands);
+}
+
+export function useUniqueCustomers() {
+  return useQuery(api.queries.getUniqueCustomers);
 }
 
 export function useInsertBrandPerformance() {

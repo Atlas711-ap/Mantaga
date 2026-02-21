@@ -216,12 +216,30 @@ export const insertLpoTable = mutation({
     delivery_date: v.string(),
     supplier: v.string(),
     delivery_location: v.string(),
+    customer: v.string(),
+    brand: v.optional(v.string()),
+    client: v.optional(v.string()),
     total_excl_vat: v.number(),
     total_vat: v.number(),
     total_incl_vat: v.number(),
+    status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("lpo_table", args);
+    // Check if LPO already exists
+    const existing = await ctx.db
+      .query("lpo_table")
+      .withIndex("by_po_number", (q) => q.eq("po_number", args.po_number))
+      .first();
+    
+    if (existing) {
+      // Update existing
+      await ctx.db.patch(existing._id, args);
+      return { action: "updated", id: existing._id };
+    }
+    
+    // Insert new
+    const id = await ctx.db.insert("lpo_table", args);
+    return { action: "inserted", id };
   },
 });
 
@@ -232,15 +250,88 @@ export const insertLpoLineItems = mutation({
     po_number: v.string(),
     barcode: v.string(),
     product_name: v.string(),
+    brand: v.optional(v.string()),
+    client: v.optional(v.string()),
     quantity_ordered: v.number(),
+    quantity_delivered: v.optional(v.number()),
     unit_cost: v.number(),
     amount_excl_vat: v.number(),
     vat_pct: v.number(),
     vat_amount: v.number(),
     amount_incl_vat: v.number(),
+    invoice_number: v.optional(v.string()),
+    invoice_date: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("lpo_line_items", args);
+    // Try to match barcode to master_sku for brand/client
+    let brand = args.brand;
+    let client = args.client;
+    
+    // Strip leading zeros from barcode for matching
+    const normalizedBarcode = args.barcode.replace(/^0+/, '');
+    
+    if (!brand || !client) {
+      // Try exact match first
+      let sku = await ctx.db
+        .query("master_sku")
+        .withIndex("by_barcode", (q) => q.eq("barcode", args.barcode))
+        .first();
+      
+      // If no exact match, try normalized
+      if (!sku) {
+        sku = await ctx.db
+          .query("master_sku")
+          .withIndex("by_barcode", (q) => q.eq("barcode", normalizedBarcode))
+          .first();
+      }
+      
+      // Try with leading zero added
+      if (!sku) {
+        sku = await ctx.db
+          .query("master_sku")
+          .withIndex("by_barcode", (q) => q.eq("barcode", "0" + normalizedBarcode))
+          .first();
+      }
+      
+      if (sku) {
+        brand = brand || sku.brand;
+        client = client || sku.client;
+      }
+    }
+    
+    // Check if line item already exists
+    const existing = await ctx.db
+      .query("lpo_line_items")
+      .withIndex("by_po_number", (q) => q.eq("po_number", args.po_number))
+      .filter((q) => q.eq(q.field("barcode"), args.barcode))
+      .first();
+    
+    const itemData = { ...args, brand, client };
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, itemData);
+      return { action: "updated", id: existing._id };
+    }
+    
+    const id = await ctx.db.insert("lpo_line_items", itemData);
+    return { action: "inserted", id };
+  },
+});
+
+// Update LPO line item with delivery info
+export const updateLpoLineItemDelivery = mutation({
+  args: {
+    id: v.id("lpo_line_items"),
+    quantity_delivered: v.number(),
+    invoice_number: v.optional(v.string()),
+    invoice_date: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      quantity_delivered: args.quantity_delivered,
+      invoice_number: args.invoice_number,
+      invoice_date: args.invoice_date,
+    });
   },
 });
 

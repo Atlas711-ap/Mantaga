@@ -364,9 +364,11 @@ Use the SKU List tab to view and manage all products.`,
             delivery_date: deliveryDate,
             supplier,
             delivery_location: deliveryLocation,
+            customer: "Talabat", // Default customer
             total_excl_vat: totalExclVat,
             total_vat: vat,
             total_incl_vat: totalInclVat,
+            status: "pending",
           });
 
           // Process line items (rows with SKU info)
