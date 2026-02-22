@@ -12,9 +12,15 @@ export async function middleware(request: any) {
   const isOnSignInPage = request.nextUrl.pathname.startsWith("/auth/signin")
   const isApiAuthRoute = request.nextUrl.pathname.startsWith("/api/auth")
   const isSeedRoute = request.nextUrl.pathname === "/api/users/seed"
+  const isAtlasRoute = request.nextUrl.pathname.startsWith("/api/atlas-parse")
 
   // Allow seed route (public - for creating first user)
   if (isSeedRoute) {
+    return NextResponse.next()
+  }
+
+  // Allow Atlas parse route (public - called from upload page)
+  if (isAtlasRoute) {
     return NextResponse.next()
   }
 
