@@ -322,8 +322,93 @@ Use the SKU List tab to view and manage all products.`,
     });
   };
 
-  // Process LPO Excel
+  // Process LPO - handles PDF (via MiniMax) and Excel
   const processLpo = async (file: File): Promise<{ success: boolean; message: string; poNumber: string }> => {
+    
+    // Handle PDF files - send to Atlas (MiniMax)
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'lpo');
+        
+        // Call Atlas API (MiniMax)
+        const response = await fetch('/api/atlas-parse', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Atlas failed to parse PDF');
+        }
+        
+        const parsed = await response.json();
+        
+        if (!parsed || !parsed.po_number) {
+          throw new Error('Could not extract LPO data from PDF');
+        }
+        
+        // Insert LPO header
+        await insertLpo({
+          po_number: parsed.po_number,
+          order_date: parsed.order_date || new Date().toISOString().split('T')[0],
+          delivery_date: parsed.delivery_date || '',
+          supplier: parsed.supplier || 'Unknown',
+          delivery_location: parsed.delivery_location || 'Talabat 3PL',
+          customer: "Talabat",
+          total_excl_vat: parsed.total_excl_vat || 0,
+          total_vat: parsed.total_vat || 0,
+          total_incl_vat: parsed.total_incl_vat || 0,
+          status: "pending",
+        });
+        
+        // Insert line items
+        let lineItemsCount = 0;
+        for (const item of parsed.line_items || []) {
+          await insertLpoLineItem({
+            po_number: parsed.po_number,
+            barcode: item.barcode || '',
+            product_name: item.product_name || 'Unknown',
+            quantity_ordered: item.quantity_ordered || 0,
+            unit_cost: item.unit_cost || 0,
+            amount_excl_vat: item.amount_excl_vat || 0,
+            vat_pct: item.vat_pct || 5,
+            vat_amount: item.vat_amount || 0,
+            amount_incl_vat: item.amount_incl_vat || 0,
+          });
+          lineItemsCount++;
+        }
+        
+        return {
+          success: true,
+          message: `📄 LPO RECEIVED — ${parsed.po_number}
+
+────────────────────────────────────────
+Parsed by: Atlas (AI)
+Order Date: ${parsed.order_date}
+Delivery Date: ${parsed.delivery_date}
+Supplier: ${parsed.supplier}
+Delivery to: ${parsed.delivery_location}
+
+Line items: ${lineItemsCount}
+Total (excl. VAT): AED ${(parsed.total_excl_vat || 0).toLocaleString()}
+Total (incl. VAT): AED ${(parsed.total_incl_vat || 0).toLocaleString()}
+
+Status: ⏳ Awaiting invoice match`,
+          poNumber: parsed.po_number,
+        };
+        
+      } catch (error: any) {
+        return {
+          success: false,
+          message: `Atlas failed to parse PDF: ${error.message}. Try converting to Excel or enter manually.`,
+          poNumber: "",
+        };
+      }
+    }
+    
+    // Handle Excel/CSV files (existing code)
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
