@@ -422,7 +422,7 @@ Status: ⏳ Awaiting invoice match`,
 
           // Try to find header row
           const headerRow = jsonData.find((row: any) => 
-            row["PO Number"] || row["PO No"] || row.po_number || row["Order Number"]
+            row.po_number || row["PO Number"] || row["PO No"] || row["Order Number"]
           );
 
           if (!headerRow) {
@@ -434,14 +434,24 @@ Status: ⏳ Awaiting invoice match`,
             return;
           }
 
-          const poNumber = headerRow["PO Number"] || headerRow["PO No"] || headerRow.po_number || headerRow["Order Number"] || `PO${Date.now()}`;
-          const orderDate = headerRow["Order Date"] || headerRow["Orderdate"] || headerRow.order_date || new Date().toISOString().split('T')[0];
-          const deliveryDate = headerRow["Delivery Date"] || headerRow["DeliveryDate"] || headerRow.delivery_date || new Date().toISOString().split('T')[0];
-          const supplier = headerRow.Supplier || headerRow.supplier || "Unknown";
-          const deliveryLocation = headerRow["Delivery Location"] || headerRow["Delivery To"] || headerRow.delivery_location || "Talabat 3PL";
-          const totalExclVat = parseFloat(headerRow["Total (excl. VAT)"] || headerRow["Total Excl VAT"] || headerRow.total_excl_vat || "0");
-          const vat = parseFloat(headerRow.VAT || headerRow.vat || "0");
-          const totalInclVat = parseFloat(headerRow["Total (incl. VAT)"] || headerRow["Total Incl VAT"] || headerRow.total_incl_vat || (totalExclVat + vat));
+          // Parse with user's Excel headers
+          const poNumber = headerRow.po_number || headerRow["PO Number"] || headerRow["PO No"] || `PO${Date.now()}`;
+          const orderDate = headerRow.po_creation_date || headerRow["Order Date"] || headerRow.order_date || new Date().toISOString().split('T')[0];
+          const deliveryDate = headerRow.po_expected_delivery_at || headerRow["Delivery Date"] || headerRow.delivery_date || '';
+          const supplier = headerRow.supplier_name || headerRow.Supplier || "Unknown";
+          const deliveryLocation = headerRow.store_name || headerRow["Delivery Location"] || "Talabat 3PL";
+          const customer = headerRow.channel_name || "Talabat";
+          
+          // Calculate totals from all rows
+          let totalExclVat = 0;
+          for (const row of jsonData) {
+            totalExclVat += parseFloat(row.ordered_amount || row.amount_excl_vat || "0");
+          }
+          const vat = totalExclVat * 0.05;
+          const totalInclVat = totalExclVat + vat;
+
+          // Get status from first row
+          const status = headerRow.po_status || "pending";
 
           // Insert LPO header
           await insertLpo({
@@ -450,29 +460,29 @@ Status: ⏳ Awaiting invoice match`,
             delivery_date: deliveryDate,
             supplier,
             delivery_location: deliveryLocation,
-            customer: "Talabat", // Default customer
+            customer,
             total_excl_vat: totalExclVat,
             total_vat: vat,
             total_incl_vat: totalInclVat,
-            status: "pending",
+            status,
           });
 
           // Process line items (rows with SKU info)
           let lineItemsCount = 0;
           for (const row of jsonData) {
-            const barcode = row.Barcode || row.barcode || row["SKU Barcode"];
-            const productName = row["Product Name"] || row.Product || row.sku_name || row.name;
-            const quantity = parseInt(row.Quantity || row.qty || row["Qty Ordered"] || "0");
-            const unitCost = parseFloat(row["Unit Cost"] || row["Unit Price"] || row.unit_cost || "0");
-            const amountExclVat = parseFloat(row["Amount (excl. VAT)"] || row.amount_excl_vat || "0");
-            const vatPct = parseFloat(row["VAT %"] || row.vat_pct || "5");
-            const vatAmount = parseFloat(row["VAT Amount"] || row.vat_amount || "0");
-            const amountInclVat = parseFloat(row["Amount (incl. VAT)"] || row.amount_incl_vat || (amountExclVat + vatAmount));
+            const barcode = row.barcode_array || row.barcode || row.sku_id || row.supplier_sku || "";
+            const productName = row.product_name || row.Product || row.sku_name || "Unknown";
+            const quantity = parseInt(row.ordered_qty || row.quantity || row["Qty Ordered"] || "0");
+            const unitCost = parseFloat(row.unit_cost || row["Unit Cost"] || row.net_cost || "0");
+            const amountExclVat = parseFloat(row.ordered_amount || row.amount_excl_vat || "0");
+            const vatPct = 5;
+            const vatAmount = amountExclVat * 0.05;
+            const amountInclVat = amountExclVat + vatAmount;
 
             if (barcode && productName && quantity > 0) {
               await insertLpoLineItem({
                 po_number: poNumber,
-                barcode,
+                barcode: String(barcode),
                 product_name: productName,
                 quantity_ordered: quantity,
                 unit_cost: unitCost,
