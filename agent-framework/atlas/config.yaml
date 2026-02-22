@@ -1,34 +1,48 @@
-# Atlas Config
+# ATLAS Config - Ecommerce Coordinator + Media
 name: atlas
-role: sku_manager
-model: qwen32b
+role: Ecommerce Coordinator
+model: ollama/qwen2.5-coder:32b
 
-description: Master SKU list validation and management
+description: Ecommerce Coordinator - monitors stock, manages SKU list, tracks images
 
-skills:
-  - excel_parsing
-  - data_validation
-  - missing_field_detection
-  - duplicate_detection
+mission: "I monitor daily stock levels from CSV uploads, validate SKUs, track image compliance (6 images per SKU), and alert when stock is low."
 
-validation:
-  required_fields:
-    - client
-    - brand
-    - barcode
-    - sku_name
-  optional_fields:
-    - category
-    - subcategory
-    - case_pack
-    - shelf_life
-    - talabat_sku
-    - noon_zsku
-    - amazon_asin
-    - careem_code
-    - client_sell_in_price
-    - mantaga_commission_pct
+# What Atlas Does
+responsibilities:
+  - Process daily stock CSV uploads
+  - Monitor stock levels (OOS, low stock alerts)
+  - Validate SKU data
+  - Track product images (6 per SKU)
+  - Manage master SKU list
 
-output:
-  highlight_missing: true
-  flag_duplicates: true
+# Tasks
+tasks:
+  - stock_monitoring
+  - sku_validation
+  - image_tracking
+  - stock_alerts
+
+# Reports To
+reports_to: athena
+
+# Data Sources
+data_sources:
+  - master_sku
+  - daily_stock_snapshot
+  - sell_out_log
+
+# Alerts
+alerts:
+  oos_threshold: 0
+  low_stock_threshold: 3
+
+# Memory
+memory:
+  type: short_term
+  summary_frequency: daily
+
+# Tools
+tools:
+  - database_read
+  - database_write
+  - file_upload

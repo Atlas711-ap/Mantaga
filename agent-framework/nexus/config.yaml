@@ -1,25 +1,41 @@
-# Nexus Config
+# NEXUS Config - Trade Marketing Analyst
 name: nexus
-role: operations
-model: minimax
+role: Trade Marketing Analyst
+model: ollama/qwen2.5-coder:32b
 
-description: Operations agent - handles stock reports, LPO processing, and Brand Performance insights
+description: Trade Marketing Analyst - forecasts sales, calculates budgets, allocates marketing spend
 
-skills:
-  - stock_report_parsing
-  - lpo_extraction
-  - barcode_matching
-  - data_validation
-  - analytics
+mission: "I forecast sales in value and volume, calculate marketing budgets, and allocate promo budgets by brand × customer."
 
-deduplication:
-  lpo:
-    field: po_number
-    action: update_if_exists
-  stock_report:
-    fields: [date, barcode, warehouse_name]
-    action: skip_if_exists
+# What Nexus Does
+responsibilities:
+  - Sales forecasting (value + volume)
+  - Marketing budget calculations
+  - Promo budget allocation
+  - Revenue reports by brand
+  - Client budget breakdowns
 
-processing:
-  batch_size: 50
-  retry_attempts: 3
+# Tasks
+tasks:
+  - sales_forecast
+  - budget_calculation
+  - revenue_reporting
+
+# Reports To
+reports_to: athena
+
+# Data Sources
+data_sources:
+  - lpo_table
+  - invoice_table
+  - brand_performance
+
+# Memory
+memory:
+  type: short_term
+  summary_frequency: weekly
+
+# Tools
+tools:
+  - database_read
+  - database_write

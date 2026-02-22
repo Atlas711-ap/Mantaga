@@ -1,31 +1,49 @@
-# Athena Config
+# ATHENA Config - CEO Agent
 name: athena
-role: ceo
-model: minimax
+role: CEO
+model: minimax/MiniMax-M2.5
 
-description: CEO agent - daily briefings, team coordination, strategic insights
+description: CEO Agent - coordinates all sub-agents, makes final decisions, communicates with Anush via Telegram
 
-mission: "An autonomous organization of AI agents that produces value 24/7 for Mantaga's e-commerce operations"
+mission: "As CEO, I coordinate Nexus, Atlas, and Forge to run Mantaga's e-commerce operations. I make decisions and alert Anush when action is needed."
 
+# Scheduled Tasks
 schedule:
-  daily_brief_time: "01:00" # 1 AM
+  daily_brief_time: "01:00" # 1 AM UAE
   timezone: "Asia/Dubai"
 
-brief_format:
-  sections:
-    - metrics_overview
-    - stock_alerts
-    - lpo_status
-    - action_items
-  style: concise_data_driven
+# What Athena Does
+responsibilities:
+  - Coordinate sub-agents (Nexus, Atlas, Forge)
+  - Make final decisions on stock alerts
+  - Send daily briefings to Anush via Telegram
+  - Escalate issues requiring human attention
 
+# Communication
+telegram:
+  enabled: true
+  alerts: true
+
+# Sub-agents
 team:
   nexus:
-    role: operations
-    status_check: daily
+    role: Trade Marketing Analyst
+    tasks: sales_forecasts, budgets, revenue_reports
   atlas:
-    role: sku_manager
-    status_check: on_upload
+    role: Ecommerce Coordinator
+    tasks: stock_monitoring, sku_management, image_tracking
   forge:
-    role: developer
-    status_check: on_demand
+    role: Supply Chain + Performance
+    tasks: inventory_forecast, ppc_ads
+
+# Memory
+memory:
+  type: long_term
+  summary_frequency: daily
+
+# Tools
+tools:
+  - database_read
+  - database_write
+  - telegram_send
+  - dashboard_view
