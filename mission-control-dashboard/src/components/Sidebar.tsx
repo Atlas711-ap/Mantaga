@@ -7,6 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 const navItems = [
   { href: "/", label: "Dashboard", emoji: "📊" },
   { href: "/sku-list", label: "SKU List", emoji: "📋" },
+  { href: "/lpo", label: "LPO", emoji: "📄" },
   { href: "/customer-performance", label: "Customers", emoji: "🛒" },
   { href: "/brand-performance", label: "Brands", emoji: "🏷️" },
   { href: "/calendar", label: "Calendar", emoji: "📅" },
