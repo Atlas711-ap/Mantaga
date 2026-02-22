@@ -14,6 +14,17 @@ const handler = NextAuth({
           return null
         }
 
+        // TEMPORARY: Allow login with sales@mantaga.com / Mantaga@S2025
+        // Remove after user is created in DB
+        if (credentials.email === "sales@mantaga.com" && credentials.password === "Mantaga@S2025") {
+          return {
+            id: "temp-sales",
+            name: "Sales",
+            email: "sales@mantaga.com",
+            role: "admin"
+          }
+        }
+
         try {
           // Call our verification API
           const response = await fetch(`${process.env.NEXT_PUBLIC_CONVEX_URL}/api/users/verify`, {
