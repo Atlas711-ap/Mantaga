@@ -32,7 +32,7 @@ interface UploadTypeConfig {
 const uploadTypes: UploadTypeConfig[] = [
   { id: "daily_stock", icon: "📊", title: "Daily Stock Report", description: "CSV file from Talabat · Processed by Nexus", agent: "Nexus", accepts: [".csv"] },
   { id: "sku_list", icon: "📋", title: "SKU List", description: "Excel file · Processed by Atlas", agent: "Atlas", accepts: [".xlsx", ".xls"] },
-  { id: "lpo", icon: "📄", title: "LPO (Purchase Order)", description: "PDF or Excel · Processed by Nexus", agent: "Nexus", accepts: [".xlsx", ".xls", ".pdf"] },
+  { id: "lpo", icon: "📄", title: "LPO (Purchase Order)", description: "Excel file (template available)", agent: "Nexus", accepts: [".xlsx", ".xls", ".csv"] },
   { id: "invoice", icon: "🧾", title: "Invoice", description: "PDF or Excel · Processed by Nexus", agent: "Nexus", accepts: [".xlsx", ".xls", ".pdf"] },
 ];
 
