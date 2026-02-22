@@ -47,6 +47,8 @@ export default function LpoPage() {
   // Line items with editable delivery
   const [editLineItems, setEditLineItems] = useState<LpoLineItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
   
   // Load data when LPO is selected
   useEffect(() => {
@@ -84,11 +86,13 @@ export default function LpoPage() {
   const handleSaveInvoice = async () => {
     if (!selectedLpoId) return;
     setSaving(true);
+    setSaveError("");
+    setSaveSuccess(false);
     
     try {
       // Update LPO header
       await updateLpo({
-        lpoId: selectedLpoId as any,
+        lpoId: selectedLpoId,
         customer: editForm.customer,
         delivery_date: editForm.delivery_date,
         status: editForm.status,
@@ -96,41 +100,46 @@ export default function LpoPage() {
       
       // Update each line item
       for (const item of editLineItems) {
-        await updateLpoLineItem({
-          lineItemId: item._id as any,
-          quantity_delivered: item.quantity_delivered,
-          amount_invoiced: item.amount_invoiced,
-        });
+        if (item.quantity_delivered && item.quantity_delivered > 0) {
+          await updateLpoLineItem({
+            lineItemId: item._id,
+            quantity_delivered: item.quantity_delivered,
+            amount_invoiced: item.amount_invoiced,
+          });
+        }
       }
       
-      // Close modal
-      setSelectedLpoId(null);
-      setSelectedLpoNumber(null);
+      setSaveSuccess(true);
       
-    } catch (error) {
+      // Close modal after short delay
+      setTimeout(() => {
+        setSelectedLpoId(null);
+        setSelectedLpoNumber(null);
+        setSaveSuccess(false);
+      }, 1000);
+      
+    } catch (error: any) {
       console.error("Failed to save:", error);
-      alert("Failed to save changes");
+      setSaveError(error?.message || "Failed to save changes");
     } finally {
       setSaving(false);
     }
   };
   
-  // Calculate totals
-  const calculateTotals = () => {
+  // Calculate totals - show stored values not reactive while typing
+  const totals = useMemo(() => {
     let orderedTotal = 0;
-    let deliveredTotal = 0;
     let invoicedTotal = 0;
+    let totalQty = 0;
     
     for (const item of editLineItems) {
       orderedTotal += item.amount_incl_vat || 0;
-      deliveredTotal += (item.quantity_delivered || 0) * item.unit_cost * 1.05;
       invoicedTotal += item.amount_invoiced || 0;
+      totalQty += item.quantity_delivered || 0;
     }
     
-    return { orderedTotal, deliveredTotal, invoicedTotal };
-  };
-  
-  const totals = calculateTotals();
+    return { orderedTotal, invoicedTotal, totalQty };
+  }, [editLineItems]);
   
   // Get status color
   const getStatusColor = (status?: string) => {
@@ -211,15 +220,15 @@ export default function LpoPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex justify-between items-start">
                 <div>
                   <h2 className="text-xl font-bold">LPO: {selectedLpo.po_number}</h2>
-                  <p className="text-gray-500">Click on cells to edit • Press Save when done</p>
+                  <p className="text-gray-500 text-sm">Fill in details and click Save</p>
                 </div>
                 <button
                   onClick={() => { setSelectedLpoId(null); setSelectedLpoNumber(null); }}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
                   ×
                 </button>
@@ -227,7 +236,7 @@ export default function LpoPage() {
             </div>
             
             {/* Editable Header Fields */}
-            <div className="p-6 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
@@ -273,22 +282,22 @@ export default function LpoPage() {
               </div>
             </div>
             
-            {/* Line Items Table */}
-            <div className="flex-1 overflow-auto p-6">
+            {/* Line Items Table - Fixed Height Scrollable */}
+            <div className="flex-1 overflow-auto min-h-0">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">Barcode</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 w-32">Barcode</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500">Product</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500">Ordered Qty</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500">Unit Cost</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500">Ordered Amount</th>
-                    <th className="px-3 py-2 text-right font-medium text-blue-600">Qty Delivered</th>
-                    <th className="px-3 py-2 text-right font-medium text-blue-600">Amount Invoiced</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 w-20">Ordered</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 w-24">Unit Cost</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 w-28">Ordered Amt</th>
+                    <th className="px-3 py-2 text-right font-medium text-blue-600 w-24">Qty Delivered</th>
+                    <th className="px-3 py-2 text-right font-medium text-blue-600 w-28">Amount Invoiced</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {editLineItems.map((item, index) => (
+                  {editLineItems.map((item) => (
                     <tr key={item._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-3 py-2 text-gray-900 dark:text-white font-mono text-xs">{item.barcode}</td>
                       <td className="px-3 py-2 text-gray-900 dark:text-white max-w-xs truncate">{item.product_name}</td>
@@ -299,9 +308,13 @@ export default function LpoPage() {
                         <input
                           type="number"
                           min="0"
+                          max={item.quantity_ordered}
                           value={item.quantity_delivered || ''}
-                          onChange={(e) => updateEditLineItem(index, 'quantity_delivered', e.target.value)}
-                          className="w-24 px-2 py-1 border border-blue-300 dark:border-blue-600 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-right font-medium"
+                          onChange={(e) => {
+                            const idx = editLineItems.findIndex(i => i._id === item._id);
+                            if (idx >= 0) updateEditLineItem(idx, 'quantity_delivered', e.target.value);
+                          }}
+                          className="w-20 px-2 py-1 border border-blue-300 dark:border-blue-600 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-right font-medium"
                           placeholder="0"
                         />
                       </td>
@@ -320,36 +333,59 @@ export default function LpoPage() {
                     </tr>
                   )}
                 </tbody>
-                <tfoot className="bg-gray-50 dark:bg-gray-700 font-medium">
-                  <tr>
-                    <td colSpan={4} className="px-3 py-2 text-right">TOTAL</td>
-                    <td className="px-3 py-2 text-right">AED {totals.orderedTotal.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right">{editLineItems.reduce((s, i) => s + (i.quantity_delivered || 0), 0)}</td>
-                    <td className="px-3 py-2 text-right text-blue-600">AED {totals.invoicedTotal.toFixed(2)}</td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
             
-            {/* Footer Actions */}
-            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <div className="text-sm text-gray-500">
-                Tip: Enter qty delivered → Amount Invoiced auto-calculates
+            {/* Footer - Fixed at bottom */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              {/* Totals Row */}
+              <div className="flex justify-end gap-8 mb-4">
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Ordered Total</p>
+                  <p className="text-lg font-bold">AED {totals.orderedTotal.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Total Qty Delivered</p>
+                  <p className="text-lg font-bold">{totals.totalQty}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-600">Total Invoiced</p>
+                  <p className="text-lg font-bold text-blue-600">AED {totals.invoicedTotal.toFixed(2)}</p>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setSelectedLpoId(null); setSelectedLpoNumber(null); }}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveInvoice}
-                  disabled={saving}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save Invoice Details'}
-                </button>
+              
+              {/* Error/Success Messages */}
+              {saveError && (
+                <div className="mb-3 p-2 bg-red-50 text-red-600 rounded-lg text-sm">
+                  {saveError}
+                </div>
+              )}
+              {saveSuccess && (
+                <div className="mb-3 p-2 bg-green-50 text-green-600 rounded-lg text-sm">
+                  ✓ Saved successfully!
+                </div>
+              )}
+              
+              {/* Buttons */}
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-500">
+                  Tip: Enter qty delivered → Amount Invoiced auto-calculates
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setSelectedLpoId(null); setSelectedLpoNumber(null); }}
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveInvoice}
+                    disabled={saving}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save Invoice Details'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
