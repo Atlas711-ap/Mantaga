@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
     
-    // Call MiniMax API
+    // Call MiniMax API - try different endpoints
     const apiKey = process.env.MINIMAX_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "MINIMAX_API_KEY not configured" }, { status: 500 });
@@ -48,19 +48,21 @@ Format:
 Extract ALL line items from the PDF. Return ONLY the JSON object.`
       : `Extract data from this document and return as JSON.`;
     
-    // Use MiniMax chat completion API
-    const response = await fetch("https://api.minimax.io/v1/chat/completions", {
+    // Try with vision model - use correct model name
+    const modelName = "abab6.5s-chat"; // MiniMax vision model
+    
+    const response = await fetch("https://api.minimax.chat/v1/text/chatcompletion_v2", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "MiniMax-M2.5",
+        model: modelName,
         messages: [
           {
             role: "user",
-            content: [
+            contents: [
               {
                 type: "image_url",
                 image_url: {
@@ -89,7 +91,18 @@ Extract ALL line items from the PDF. Return ONLY the JSON object.`
     }
     
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
+    console.log("MiniMax response:", JSON.stringify(data).substring(0, 500));
+    
+    // Different API might have different response format
+    const content = data.choices?.[0]?.message?.content || 
+                    data.choices?.[0]?.message?.text ||
+                    data.choices?.[0]?.text ||
+                    "";
+    
+    if (!content) {
+      console.error("No content in response:", data);
+      return NextResponse.json({ error: "No content from AI", details: data }, { status: 500 });
+    }
     
     // Extract JSON from response
     let jsonStr = content.trim();
