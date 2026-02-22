@@ -7,7 +7,8 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 export async function POST() {
   try {
     // Check if admin exists
-    const existingAdmin = await convex.query("getUserByEmail", { email: "admin@mantaga.ae" })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingAdmin: any = await (convex.query as any)("getUserByEmail", { email: "admin@mantaga.ae" })
 
     if (existingAdmin) {
       return NextResponse.json({ message: "Admin already exists", created: false })
@@ -17,7 +18,8 @@ export async function POST() {
     const adminPassword = "Mantaga@S2025"
     const passwordHash = await bcrypt.hash(adminPassword, 10)
 
-    const adminId = await convex.mutation("createUser", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adminId = await (convex.mutation as any)("createUser", {
       email: "admin@mantaga.ae",
       name: "Admin",
       passwordHash,

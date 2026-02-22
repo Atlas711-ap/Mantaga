@@ -12,8 +12,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing credentials" }, { status: 400 })
     }
 
-    // Query user from Convex
-    const user = await convex.query("getUserByEmail", { email })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const user: any = await (convex.query as any)("getUserByEmail", { email })
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })

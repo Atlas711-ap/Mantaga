@@ -11,13 +11,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Update user in Convex
-    // Convert string ID to convex ID
-    const { DocId } = await import("convex/values")
-    const convexUserId: any = DocId("users", userId)
-
-    await convex.mutation("updateUserProfile", {
-      userId: convexUserId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (convex.mutation as any)("updateUserProfile", {
+      userId,
       name,
       email,
     })
