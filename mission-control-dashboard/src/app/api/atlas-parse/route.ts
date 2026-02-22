@@ -12,21 +12,16 @@ export async function POST(request: NextRequest) {
     
     // Read file as base64
     const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString("base64");
     const mimeType = file.type || "application/pdf";
     
-    // Try with image understanding API - different endpoint
     const apiKey = process.env.MINIMAX_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "MINIMAX_API_KEY not configured" }, { status: 500 });
     }
     
-    const prompt = type === "lpo" 
-      ? `Extract LPO data. Return ONLY valid JSON with: po_number, order_date (YYYY-MM-DD), delivery_date, supplier, delivery_location, line_items array with: barcode, product_name, quantity_ordered, unit_cost, vat_pct, amount_excl_vat, vat_amount, amount_incl_vat.`
-      : `Extract data as JSON.`;
-    
-    // Try using the vision model via correct endpoint
-    // Using the coding plan API
+    // Try using the coding plan API with correct model
     const response = await fetch("https://api.minimax.io/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -47,12 +42,13 @@ export async function POST(request: NextRequest) {
               },
               {
                 type: "text",
-                text: prompt
+                text: `Extract all LPO data as JSON. Include: po_number, order_date (YYYY-MM-DD), delivery_date, supplier, delivery_location, line_items array with: barcode, product_name, quantity_ordered, unit_cost, vat_pct, amount_excl_vat, vat_amount, amount_incl_vat. Return ONLY JSON.`
               }
             ]
           }
         ],
-        max_tokens: 32000,
+        temperature: 0.1,
+        max_tokens: 8000,
       }),
     });
     
@@ -60,50 +56,56 @@ export async function POST(request: NextRequest) {
       const errorText = await response.text();
       console.error("MiniMax API error:", response.status, errorText);
       return NextResponse.json({ 
-        error: "Failed to parse with AI", 
+        error: "API error", 
         details: errorText,
         status: response.status 
       }, { status: 500 });
     }
     
     const data = await response.json();
-    console.log("MiniMax response:", JSON.stringify(data).substring(0, 500));
+    console.log("MiniMax response keys:", Object.keys(data));
+    console.log("First 200 chars:", JSON.stringify(data).substring(0, 200));
     
-    // Different API might have different response format
-    const content = data.choices?.[0]?.message?.content || 
-                    data.choices?.[0]?.message?.text ||
-                    data.choices?.[0]?.text ||
-                    "";
+    // Try to find content in response
+    let content = "";
+    if (data.choices && data.choices[0]) {
+      const msg = data.choices[0].message || data.choices[0];
+      content = msg.content || msg.text || msg.response || "";
+    }
+    if (!content && data.output) {
+      content = typeof data.output === 'string' ? data.output : JSON.stringify(data.output);
+    }
+    if (!content && data.text) {
+      content = typeof data.text === 'string' ? data.text : JSON.stringify(data.text);
+    }
     
     if (!content) {
-      console.error("No content in response:", data);
-      return NextResponse.json({ error: "No content from AI", details: data }, { status: 500 });
+      return NextResponse.json({ 
+        error: "No content from AI", 
+        debug: data 
+      }, { status: 500 });
     }
     
-    // Extract JSON from response
+    // Extract JSON
     let jsonStr = content.trim();
-    if (jsonStr.startsWith("```json")) {
-      jsonStr = jsonStr.slice(7);
-    }
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.slice(3);
-    }
-    if (jsonStr.endsWith("```")) {
-      jsonStr = jsonStr.slice(0, -3);
-    }
-    jsonStr = jsonStr.trim();
+    // Remove markdown code blocks
+    jsonStr = jsonStr.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```$/, '').trim();
     
-    // Parse JSON
     let parsed;
     try {
       parsed = JSON.parse(jsonStr);
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError, "Content:", jsonStr);
-      return NextResponse.json({ error: "Could not parse AI response as JSON", raw: jsonStr }, { status: 400 });
+    } catch {
+      // Try to find JSON in the text
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        return NextResponse.json({ error: "Could not parse JSON", raw: jsonStr }, { status: 400 });
+      }
     }
     
-    // Calculate totals if not provided
-    if (parsed.line_items && !parsed.total_excl_vat) {
+    // Calculate totals
+    if (parsed.line_items) {
       parsed.total_excl_vat = parsed.line_items.reduce((sum: number, item: any) => sum + (item.amount_excl_vat || 0), 0);
       parsed.total_vat = parsed.line_items.reduce((sum: number, item: any) => sum + (item.vat_amount || 0), 0);
       parsed.total_incl_vat = parsed.line_items.reduce((sum: number, item: any) => sum + (item.amount_incl_vat || 0), 0);
