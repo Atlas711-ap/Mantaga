@@ -90,6 +90,9 @@ export default function LpoPage() {
     setSaveSuccess(false);
     
     try {
+      console.log("Saving LPO ID:", selectedLpoId);
+      console.log("Form data:", editForm);
+      
       // Update LPO header
       await updateLpo({
         lpoId: selectedLpoId,
@@ -98,9 +101,12 @@ export default function LpoPage() {
         status: editForm.status,
       });
       
+      console.log("Header saved, updating line items...");
+      
       // Update each line item
       for (const item of editLineItems) {
         if (item.quantity_delivered && item.quantity_delivered > 0) {
+          console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced);
           await updateLpoLineItem({
             lineItemId: item._id,
             quantity_delivered: item.quantity_delivered,
@@ -109,6 +115,7 @@ export default function LpoPage() {
         }
       }
       
+      console.log("All items saved!");
       setSaveSuccess(true);
       
       // Close modal after short delay
@@ -116,11 +123,11 @@ export default function LpoPage() {
         setSelectedLpoId(null);
         setSelectedLpoNumber(null);
         setSaveSuccess(false);
-      }, 1000);
+      }, 1500);
       
     } catch (error: any) {
       console.error("Failed to save:", error);
-      setSaveError(error?.message || "Failed to save changes");
+      setSaveError("Error: " + (error?.message || JSON.stringify(error) || "Unknown error"));
     } finally {
       setSaving(false);
     }
