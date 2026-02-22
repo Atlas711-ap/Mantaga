@@ -445,7 +445,16 @@ Status: ⏳ Awaiting invoice match`,
           // Calculate totals from all rows
           let totalExclVat = 0;
           for (const row of jsonData) {
-            totalExclVat += parseFloat(row.ordered_amount || row.amount_excl_vat || "0");
+            const amount = parseFloat(
+              row.ordered_amount || 
+              row.amount || 
+              row.total_amount ||
+              row.amount_excl_vat || 
+              row.net_cost || 
+              row.quantity * row.unit_cost ||
+              "0"
+            );
+            totalExclVat += amount;
           }
           const vat = totalExclVat * 0.05;
           const totalInclVat = totalExclVat + vat;
@@ -474,7 +483,11 @@ Status: ⏳ Awaiting invoice match`,
             const productName = row.product_name || row.Product || row.sku_name || "Unknown";
             const quantity = parseInt(row.ordered_qty || row.quantity || row["Qty Ordered"] || "0");
             const unitCost = parseFloat(row.unit_cost || row["Unit Cost"] || row.net_cost || "0");
-            const amountExclVat = parseFloat(row.ordered_amount || row.amount_excl_vat || "0");
+            let amountExclVat = parseFloat(row.ordered_amount || row.amount || row.total_amount || row.amount_excl_vat || "0");
+            // If amount is 0, calculate from qty * unit cost
+            if (amountExclVat === 0 && quantity > 0 && unitCost > 0) {
+              amountExclVat = quantity * unitCost;
+            }
             const vatPct = 5;
             const vatAmount = amountExclVat * 0.05;
             const amountInclVat = amountExclVat + vatAmount;
