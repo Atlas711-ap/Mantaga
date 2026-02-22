@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
 
-export function middleware(request: any) {
-  const isLoggedIn = request.cookies.get("next-auth.session-token") || request.cookies.get("__Secure-next-auth.session-token")
+export async function middleware(request: any) {
+  // Use NextAuth's getToken to properly check JWT session
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  })
+  
+  const isLoggedIn = !!token
   const isOnSignInPage = request.nextUrl.pathname.startsWith("/auth/signin")
   const isApiAuthRoute = request.nextUrl.pathname.startsWith("/api/auth")
+  const isPublicRoute = request.nextUrl.pathname === "/" || 
+                        request.nextUrl.pathname.startsWith("/auth") ||
+                        request.nextUrl.pathname.startsWith("/api/auth")
 
   // Allow API auth routes
   if (isApiAuthRoute) {
@@ -24,5 +34,5 @@ export function middleware(request: any) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|public/).*)"],
 }
