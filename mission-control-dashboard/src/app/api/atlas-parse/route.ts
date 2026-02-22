@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       : `Extract data as JSON.`;
     
     // Try using the vision model via correct endpoint
+    // Using the coding plan API
     const response = await fetch("https://api.minimax.io/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "abab6.5s-chat",
+        model: "MiniMax-Text-01",
         messages: [
           {
             role: "user",
