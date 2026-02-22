@@ -407,3 +407,12 @@ export const getAllUsers = query({
     return await ctx.db.query("users").collect();
   },
 });
+
+// ============ LPO QUERIES ============
+
+export const getLpoById = query({
+  args: { lpoId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.lpoId as any);
+  },
+});

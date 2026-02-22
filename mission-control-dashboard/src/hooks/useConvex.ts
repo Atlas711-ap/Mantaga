@@ -210,3 +210,11 @@ export function useKnowledgeBaseByKey(key: string) {
 export function useUpdateKnowledgeBase() {
   return useMutation(api.mutations.updateKnowledgeBase);
 }
+
+export const useUpdateLpo = () => {
+  return useMutation(api.mutations.updateLpo);
+};
+
+export const useUpdateLpoLineItem = () => {
+  return useMutation(api.mutations.updateLpoLineItem);
+};

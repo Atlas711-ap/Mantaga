@@ -698,3 +698,41 @@ export const getUserByEmail = mutation({
     return user;
   },
 });
+
+// ============ LPO UPDATES ============
+
+export const updateLpo = mutation({
+  args: {
+    lpoId: v.id("lpo_table"),
+    customer: v.optional(v.string()),
+    status: v.optional(v.string()),
+    delivery_date: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const updateData: any = {};
+    if (args.customer !== undefined) updateData.customer = args.customer;
+    if (args.status !== undefined) updateData.status = args.status;
+    if (args.delivery_date !== undefined) updateData.delivery_date = args.delivery_date;
+    if (args.notes !== undefined) updateData.notes = args.notes;
+    
+    await ctx.db.patch(args.lpoId, updateData);
+    return { success: true };
+  },
+});
+
+export const updateLpoLineItem = mutation({
+  args: {
+    lineItemId: v.id("lpo_line_items"),
+    quantity_delivered: v.optional(v.number()),
+    amount_invoiced: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const updateData: any = {};
+    if (args.quantity_delivered !== undefined) updateData.quantity_delivered = args.quantity_delivered;
+    if (args.amount_invoiced !== undefined) updateData.amount_invoiced = args.amount_invoiced;
+    
+    await ctx.db.patch(args.lineItemId, updateData);
+    return { success: true };
+  },
+});
