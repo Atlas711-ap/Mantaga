@@ -435,29 +435,20 @@ Status: ⏳ Awaiting invoice match`,
           }
 
           // Parse with user's Excel headers
-          const poNumber = headerRow.po_number || headerRow["PO Number"] || headerRow["PO No"] || `PO${Date.now()}`;
-          const orderDate = headerRow.po_creation_date || headerRow["Order Date"] || headerRow.order_date || new Date().toISOString().split('T')[0];
-          const deliveryDate = headerRow.po_expected_delivery_at || headerRow["Delivery Date"] || headerRow.delivery_date || '';
-          const supplier = headerRow.supplier_name || headerRow.Supplier || "Unknown";
-          const deliveryLocation = headerRow.store_name || headerRow["Delivery Location"] || "Talabat 3PL";
+          const poNumber = headerRow.po_number || `PO${Date.now()}`;
+          const orderDate = headerRow.po_creation_date || new Date().toISOString().split('T')[0];
+          const deliveryDate = headerRow.po_expected_delivery_at || '';
+          const supplier = headerRow.supplier_name || "Unknown";
+          const deliveryLocation = headerRow.store_name || "Talabat 3PL";
           const customer = headerRow.channel_name || "Talabat";
           
-          // Calculate totals from all rows
-          let totalExclVat = 0;
+          // Calculate totals from all rows (ordered_amount includes 5% VAT)
+          let totalInclVat = 0;
           for (const row of jsonData) {
-            const amount = parseFloat(
-              row.ordered_amount || 
-              row.amount || 
-              row.total_amount ||
-              row.amount_excl_vat || 
-              row.net_cost || 
-              row.quantity * row.unit_cost ||
-              "0"
-            );
-            totalExclVat += amount;
+            totalInclVat += parseFloat(row.ordered_amount || "0");
           }
+          const totalExclVat = totalInclVat / 1.05;
           const vat = totalExclVat * 0.05;
-          const totalInclVat = totalExclVat + vat;
 
           // Get status from first row
           const status = headerRow.po_status || "pending";
@@ -479,18 +470,15 @@ Status: ⏳ Awaiting invoice match`,
           // Process line items (rows with SKU info)
           let lineItemsCount = 0;
           for (const row of jsonData) {
-            const barcode = row.barcode_array || row.barcode || row.sku_id || row.supplier_sku || "";
-            const productName = row.product_name || row.Product || row.sku_name || "Unknown";
-            const quantity = parseInt(row.ordered_qty || row.quantity || row["Qty Ordered"] || "0");
-            const unitCost = parseFloat(row.unit_cost || row["Unit Cost"] || row.net_cost || "0");
-            let amountExclVat = parseFloat(row.ordered_amount || row.amount || row.total_amount || row.amount_excl_vat || "0");
-            // If amount is 0, calculate from qty * unit cost
-            if (amountExclVat === 0 && quantity > 0 && unitCost > 0) {
-              amountExclVat = quantity * unitCost;
-            }
-            const vatPct = 5;
+            const barcode = row.barcode_array || row.barcode || row.sku_id || "";
+            const productName = row.product_name || "Unknown";
+            const quantity = parseInt(row.ordered_qty || row.quantity || "0");
+            const unitCost = parseFloat(row.unit_cost || "0");
+            // ordered_amount includes 5% VAT, so extract base amount
+            const amountInclVat = parseFloat(row.ordered_amount || "0");
+            const amountExclVat = amountInclVat / 1.05;
             const vatAmount = amountExclVat * 0.05;
-            const amountInclVat = amountExclVat + vatAmount;
+            const vatPct = 5;
 
             if (barcode && productName && quantity > 0) {
               await insertLpoLineItem({
