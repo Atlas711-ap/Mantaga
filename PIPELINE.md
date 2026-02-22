@@ -1,139 +1,91 @@
-# Mantaga Complete Roadmap - AI-Powered Operations
+# Mantaga Roadmap - AI Agent Operations
 
 ## Mission
-**Goal:** Replace 7-human team with 4 AI Agents + 1 CEO (Anush)
-
-**Target:** 1M AED revenue = 10M AED sales (10% commission)
+Replace 7-human team with 4 AI Agents + 1 CEO (Anush)
 
 ---
 
-## The AI Team
+## AI Agent Team
 
 ```
 CEO (Anush)
     │
-    ├── ATHENA (CEO Agent) 🤖
-    │   • Coordinates all agents
-    │   • Makes final decisions
-    │   • Communicates with Anush via Telegram
-    │   • Daily briefings
-    │   • Alert when action needed
+    ├── ATHENA (CEO Agent) - MiniMax M2.5
+    │   ├── Heartbeat: 30 min
+    │   └── Cron: Daily brief (1 AM), EOD summary
     │
-    ├── NEXUS (Trade Marketing Analyst) 🤖
-    │   • Sales forecasting (value + volume)
-    │   • Marketing budget calculations
-    │   • Promo budget allocation
-    │   • Client budgets by brand × customer
-    │   • Revenue reports
+    ├── NEXUS (Trade Marketing) - Qwen 32B
+    │   ├── Heartbeat: Weekly
+    │   └── Cron: Monthly reports, budget cycles
     │
-    ├── ATLAS (Ecommerce Coordinator + Media) 🤖
-    │   • Master SKU list management
-    │   • Daily stock monitoring from CSV
-    │   • Stock alerts (OOS, low stock)
-    │   • Image tracking (6 images per SKU)
-    │   • OneDrive integration for images
+    ├── ATLAS (Ecommerce) - Qwen 32B
+    │   ├── Heartbeat: Daily
+    │   └── Cron: Process uploads, validate SKUs
     │
-    └── FORGE (Supply Chain + Performance Marketing) 🤖
-        • Volume forecasting by SKU
-        • Micro/macro event adjustments
-        • PPC ad management (Amazon, Talabat, Noon)
-        • Ad performance reporting
+    └── FORGE (Supply Chain + Ads) - Qwen 32B
+        ├── Heartbeat: Weekly
+        └── Cron: Ad performance, inventory forecast
 ```
 
 ---
 
-## Data Flow
+## Agent Heartbeats & Cron Jobs
 
-```
-Email (Daily Stock from Customer)
-         ↓
-    ATLAS receives
-         ↓
-    Analyzes stock levels
-         ↓
-    If issue → ATHENA notified
-         ↓
-    ATHENA alerts Anush via Telegram
-         ↓
-    OR FORGE handles (if supply chain)
-         ↓
-    NEXUS updates forecasts
-```
+### ATHENA (CEO)
+| Task | Frequency | Trigger |
+|------|-----------|----------|
+| Heartbeat | Every 30 min | Check for issues |
+| Morning Brief | 1 AM daily | Telegram to Anush |
+| EOD Summary | 8 PM daily | Telegram to Anush |
+| Escalation | On demand | When sub-agent needs decision |
+
+### NEXUS (Trade Marketing)
+| Task | Frequency | Trigger |
+|------|-----------|----------|
+| Heartbeat | Weekly | Revenue vs forecast |
+| Monthly Report | 1st of month | Commission calculation |
+| Budget Review | On LPO | When new LPO uploaded |
+
+### ATLAS (Ecommerce)
+| Task | Frequency | Trigger |
+|------|-----------|----------|
+| Heartbeat | Daily | Stock levels check |
+| Process Upload | On upload | CSV/Excel uploaded |
+| SKU Validation | On upload | Check barcode/product |
+| Stock Alert | On upload | If OOS detected |
+
+### FORGE (Supply Chain)
+| Task | Frequency | Trigger |
+|------|-----------|----------|
+| Heartbeat | Weekly | Inventory forecast |
+| Ad Report | Weekly | PPC performance |
+| Reorder Suggest | On stock alert | When low stock |
 
 ---
 
 ## Progressive Build
 
-### 🟢 BUILD 1: Core Operations (This Week)
-**Goal:** Get data flowing
+### Phase 1: Core (This Week)
+- [ ] Test LPO fixes
+- [ ] Upload Stock CSV → Stock Alerts on dashboard
+- [ ] Update Team tab (agent cards with roles)
 
-| Task | Agent | Status |
-|------|-------|--------|
-| Fix LPO bugs | - | Just fixed |
-| Stock CSV upload → Alerts | Atlas | Next |
-| Daily brief to Telegram | Athena | Next |
-| LPO → Invoice tracking | Atlas | Next |
+### Phase 2: Chatroom (Month 1)
+- [ ] Build Chatroom with @tag support
+- [ ] All agents see messages
+- [ ] @tag routes to specific agent
 
----
+### Phase 3: Agent Automation (Month 1-2)
+- [ ] Atlas: Process uploads automatically
+- [ ] Atlas: Stock alerts
+- [ ] Nexus: Revenue reports
+- [ ] Forge: Ad reports
 
-### 🟢 BUILD 2: Agent Roles (Month 1)
-**Goal:** Define each agent properly
-
-| Task | Agent |
-|------|-------|
-| Nexus = Trade Marketing | Sales forecasts, budgets |
-| Atlas = Ecommerce + Media | Stock, SKU, Images |
-| Forge = Supply Chain + Ads | Forecasting, PPC |
-| Athena = CEO | Coordination, Telegram |
-
----
-
-### 🟢 BUILD 3: Full Automation (Month 2)
-**Goal:** Agents work autonomously
-
-| Task |
-|------|
-| Auto-fetch stock from email |
-| Auto-run daily analysis |
-| Auto-generate reports |
-| Auto-optimize ads (Forge) |
-
----
-
-## What Each Tab Maps To
-
-| Tab | Current | Future (Agent) |
-|-----|---------|----------------|
-| Dashboard | Stock alerts | Athena's command center |
-| Upload | Manual | Atlas receives data |
-| LPO | Manual entry | Atlas processes |
-| SKU List | List | Atlas + Forge manage |
-| Team | Agent cards | Full org visualization |
-| Chatroom | Chat | Talk to Athena |
-| Performance | Placeholder | Nexus reports |
-| Images | - | Atlas image tracker |
-
----
-
-## Key Integrations Needed
-
-### Data Sources
-- 📧 Email (daily stock) → Atlas
-- 📊 Amazon/Talabat/Noon reports → Forge
-- 📁 OneDrive → Atlas (images)
-
-### Outputs
-- 📱 Telegram → Athena → Anush
-- 📊 Dashboard → All agents
-- 📄 Reports → Nexus generates
-
----
-
-## This Is Mantaga
-
-Instead of hiring 7 people → 4 AI Agents do the work
-
-Anush manages Athena → Athena coordinates Nexus/Atlas/Forge → Team runs itself
+### Phase 4: Full Autonomy (Month 2+)
+- [ ] All agents running 24/7
+- [ ] Heartbeats active
+- [ ] Cron jobs scheduled
+- [ ] Self-healing workflows
 
 ---
 
