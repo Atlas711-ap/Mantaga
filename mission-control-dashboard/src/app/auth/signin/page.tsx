@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
@@ -11,7 +11,6 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-  const { update } = useSession();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,9 +27,8 @@ export default function SignInPage() {
       setError("Invalid email or password");
       setLoading(false);
     } else {
-      // Update session and redirect
-      await update();
-      router.replace("/");
+      // Direct redirect to dashboard
+      window.location.href = "/";
     }
   };
 
