@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { ConvexHttpClient } from "convex/browser"
 import bcrypt from "bcryptjs"
 
