@@ -11,9 +11,12 @@ export async function middleware(request: any) {
   const isLoggedIn = !!token
   const isOnSignInPage = request.nextUrl.pathname.startsWith("/auth/signin")
   const isApiAuthRoute = request.nextUrl.pathname.startsWith("/api/auth")
-  const isPublicRoute = request.nextUrl.pathname === "/" || 
-                        request.nextUrl.pathname.startsWith("/auth") ||
-                        request.nextUrl.pathname.startsWith("/api/auth")
+  const isSeedRoute = request.nextUrl.pathname === "/api/users/seed"
+
+  // Allow seed route (public - for creating first user)
+  if (isSeedRoute) {
+    return NextResponse.next()
+  }
 
   // Allow API auth routes
   if (isApiAuthRoute) {
