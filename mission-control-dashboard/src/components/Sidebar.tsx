@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 
 const navItems = [
   { href: "/", label: "Dashboard", emoji: "📊" },
@@ -12,10 +13,16 @@ const navItems = [
   { href: "/team", label: "Team", emoji: "👥" },
   { href: "/chatroom", label: "Chat", emoji: "💬" },
   { href: "/upload", label: "Upload", emoji: "📤" },
+  { href: "/settings", label: "Settings", emoji: "⚙️" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name || "User";
+  const userRole = session?.user?.role || "user";
+  const userInitial = userName.charAt(0).toUpperCase();
 
   return (
     <aside className="w-56 bg-white dark:bg-[#1C1C1E] border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen fixed left-0 top-0 z-50">
@@ -57,11 +64,11 @@ export default function Sidebar() {
       <div className="p-4 border-t border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3 px-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
-            A
+            {userInitial}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Anush</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Admin</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{userName}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{userRole}</p>
           </div>
         </div>
       </div>

@@ -166,4 +166,14 @@ export default defineSchema({
     updated_by: v.string(),
     updated_at: v.string(),
   }).index("by_key", ["key"]),
+
+  // User management for auth
+  users: defineTable({
+    email: v.string(),
+    name: v.string(),
+    passwordHash: v.string(),
+    role: v.union(v.literal("admin"), v.literal("user")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_email", ["email"]),
 });

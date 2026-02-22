@@ -6,24 +6,45 @@ const handler = NextAuth({
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        username: { label: "Username", type: "text" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const adminUser = "Admin"
-        const adminPass = "Mantaga@S2025"
-        
-        const inputUser = credentials?.username?.trim()
-        const inputPass = credentials?.password?.trim()
-        
-        if (inputUser === adminUser && inputPass === adminPass) {
-          return {
-            id: "1",
-            name: "Admin",
-            email: "admin@mantaga.ae"
-          }
+        if (!credentials?.email || !credentials?.password) {
+          return null
         }
-        return null
+
+        try {
+          // Call our verification API
+          const response = await fetch(`${process.env.NEXT_PUBLIC_CONVEX_URL}/api/users/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            console.log("Verification error:", errorData)
+            return null
+          }
+
+          const user = await response.json()
+
+          return {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
+        }
       }
     })
   ],
@@ -32,6 +53,22 @@ const handler = NextAuth({
   },
   session: {
     strategy: "jwt",
+  },
+  callbacks: {
+    async jwt({ token, user }: any) {
+      if (user) {
+        token.role = user.role
+        token.id = user.id
+      }
+      return token
+    },
+    async session({ session, token }: any) {
+      if (session.user) {
+        session.user.role = token.role
+        session.user.id = token.id
+      }
+      return session
+    }
   },
   secret: process.env.NEXTAUTH_SECRET,
 })

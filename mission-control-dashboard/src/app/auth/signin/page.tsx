@@ -5,12 +5,11 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,14 +18,13 @@ export default function SignInPage() {
     setError("");
 
     const result = await signIn("credentials", {
-      username,
+      email,
       password,
-      remember: rememberMe,
       redirect: false,
     });
 
     if (result?.error) {
-      setError(`Invalid username or password. Entered: "${username}"`);
+      setError("Invalid email or password");
       setLoading(false);
     } else {
       router.push("/");
@@ -53,14 +51,14 @@ export default function SignInPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Username
+              Email
             </label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-              placeholder="Enter username"
+              placeholder="Enter email"
               required
             />
           </div>
@@ -95,19 +93,6 @@ export default function SignInPage() {
                 )}
               </button>
             </div>
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="remember" className="ml-2 text-sm text-gray-700">
-              Keep me signed in
-            </label>
           </div>
 
           <button

@@ -626,3 +626,75 @@ export const updateKnowledgeBase = mutation({
     return { action: "inserted", id };
   },
 });
+
+// ============ USER MANAGEMENT ============
+
+export const createUser = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+    passwordHash: v.string(),
+    role: v.union(v.literal("admin"), v.literal("user")),
+  },
+  handler: async (ctx, args) => {
+    // Check if user already exists
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+    
+    if (existing) {
+      throw new Error("User already exists");
+    }
+    
+    const id = await ctx.db.insert("users", {
+      ...args,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    return id;
+  },
+});
+
+export const updateUserProfile = mutation({
+  args: {
+    userId: v.id("users"),
+    name: v.string(),
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, {
+      name: args.name,
+      email: args.email,
+      updatedAt: new Date().toISOString(),
+    });
+    return { success: true };
+  },
+});
+
+export const updateUserPassword = mutation({
+  args: {
+    userId: v.id("users"),
+    passwordHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, {
+      passwordHash: args.passwordHash,
+      updatedAt: new Date().toISOString(),
+    });
+    return { success: true };
+  },
+});
+
+export const getUserByEmail = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+    return user;
+  },
+});
