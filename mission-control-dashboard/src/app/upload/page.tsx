@@ -331,25 +331,22 @@ Use the SKU List tab to view and manage all products.`,
       if (file.name.toLowerCase().endsWith('.pdf')) {
         reader.onload = async (e) => {
           try {
-            // Dynamic import pdfjs
-            const pdfjsLib = await import('pdfjs-dist');
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+            // Send PDF to server-side API for parsing
+            const formData = new FormData();
+            formData.append('file', file);
             
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const pdf = await pdfjsLib.getDocument({ data }).promise;
+            const response = await fetch('/api/parse-lpo-pdf', {
+              method: 'POST',
+              body: formData,
+            });
             
-            let fullText = '';
-            for (let i = 1; i <= pdf.numPages; i++) {
-              const page = await pdf.getPage(i);
-              const textContent = await page.getTextContent();
-              const pageText = textContent.items.map((item: any) => item.str).join(' ');
-              fullText += pageText + '\n';
+            if (!response.ok) {
+              throw new Error('PDF parsing failed on server');
             }
             
-            // Parse the extracted text
-            const parsed = parseQuadrantLpoFromText(fullText);
+            const parsed = await response.json();
             
-            if (!parsed) {
+            if (!parsed || !parsed.po_number) {
               resolve({
                 success: false,
                 message: "Could not parse PDF. Please convert to Excel or enter manually in /lpo",
