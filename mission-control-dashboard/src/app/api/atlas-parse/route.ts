@@ -81,7 +81,11 @@ Extract ALL line items from the PDF. Return ONLY the JSON object.`
     if (!response.ok) {
       const errorText = await response.text();
       console.error("MiniMax API error:", response.status, errorText);
-      return NextResponse.json({ error: "Failed to parse with AI", details: errorText }, { status: 500 });
+      return NextResponse.json({ 
+        error: "Failed to parse with AI", 
+        details: errorText,
+        status: response.status 
+      }, { status: 500 });
     }
     
     const data = await response.json();
