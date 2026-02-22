@@ -48,10 +48,11 @@ Format:
 Extract ALL line items from the PDF. Return ONLY the JSON object.`
       : `Extract data from this document and return as JSON.`;
     
-    const response = await fetch("https://api.minimax.chat/v1/text/_v2", {
+    // Use MiniMax chat completion API
+    const response = await fetch("https://api.minimax.io/v1/chat/completions", {
       method: "POST",
       headers: {
-        "chatcompletionAuthorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -79,7 +80,7 @@ Extract ALL line items from the PDF. Return ONLY the JSON object.`
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("MiniMax API error:", errorText);
+      console.error("MiniMax API error:", response.status, errorText);
       return NextResponse.json({ error: "Failed to parse with AI", details: errorText }, { status: 500 });
     }
     
