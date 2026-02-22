@@ -27,12 +27,13 @@ interface UploadTypeConfig {
   description: string;
   agent: string;
   accepts: string[];
+  mimeTypes?: string[];
 }
 
 const uploadTypes: UploadTypeConfig[] = [
   { id: "daily_stock", icon: "📊", title: "Daily Stock Report", description: "CSV file from Talabat · Processed by Nexus", agent: "Nexus", accepts: [".csv"] },
   { id: "sku_list", icon: "📋", title: "SKU List", description: "Excel file · Processed by Atlas", agent: "Atlas", accepts: [".xlsx", ".xls"] },
-  { id: "lpo", icon: "📄", title: "LPO (Purchase Order)", description: "PDF or Excel · Processed by Atlas (AI)", agent: "Atlas", accepts: [".xlsx", ".xls", ".csv", ".pdf"] },
+  { id: "lpo", icon: "📄", title: "LPO (Purchase Order)", description: "PDF or Excel · Processed by Atlas (AI)", agent: "Atlas", accepts: [".xlsx", ".xls", ".csv", ".pdf"], mimeTypes: ["application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv"] },
   { id: "invoice", icon: "🧾", title: "Invoice", description: "PDF or Excel · Processed by Nexus", agent: "Nexus", accepts: [".xlsx", ".xls", ".pdf"] },
 ];
 
@@ -785,7 +786,7 @@ All ${uploadedFiles.length} files have been merged into the database.`,
             <input
               ref={fileInputRef}
               type="file"
-              accept={uploadTypes.find(t => t.id === selectedType)?.accepts.join(",")}
+              accept={(uploadTypes.find(t => t.id === selectedType)?.accepts.join(",") + "," + (uploadTypes.find(t => t.id === selectedType) as any)?.mimeTypes?.join(",") || "")}
               multiple
               onChange={handleFileSelect}
               className="hidden"
