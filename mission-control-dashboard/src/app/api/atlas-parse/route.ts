@@ -15,54 +15,29 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
     
-    // Call MiniMax API - try different endpoints
+    // Try with image understanding API - different endpoint
     const apiKey = process.env.MINIMAX_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "MINIMAX_API_KEY not configured" }, { status: 500 });
     }
     
     const prompt = type === "lpo" 
-      ? `You are Atlas, a document parsing AI. Extract the LPO (Purchase Order) data from this PDF and return ONLY valid JSON - no markdown, no explanation. 
-
-Format:
-{
-  "po_number": "PO1234567",
-  "order_date": "YYYY-MM-DD",
-  "delivery_date": "YYYY-MM-DD", 
-  "supplier": "Supplier Name",
-  "delivery_location": "UAE_Talabat_3pl_XXX",
-  "line_items": [
-    {
-      "barcode": "09501033112124",
-      "product_name": "Product Name",
-      "quantity_ordered": 100,
-      "unit_cost": 4.00,
-      "vat_pct": 5,
-      "amount_excl_vat": 400.00,
-      "vat_amount": 20.00,
-      "amount_incl_vat": 420.00
-    }
-  ]
-}
-
-Extract ALL line items from the PDF. Return ONLY the JSON object.`
-      : `Extract data from this document and return as JSON.`;
+      ? `Extract LPO data. Return ONLY valid JSON with: po_number, order_date (YYYY-MM-DD), delivery_date, supplier, delivery_location, line_items array with: barcode, product_name, quantity_ordered, unit_cost, vat_pct, amount_excl_vat, vat_amount, amount_incl_vat.`
+      : `Extract data as JSON.`;
     
-    // Try with vision model - use correct model name
-    const modelName = "abab6.5s-chat"; // MiniMax vision model
-    
-    const response = await fetch("https://api.minimax.chat/v1/text/chatcompletion_v2", {
+    // Try using the vision model via correct endpoint
+    const response = await fetch("https://api.minimax.io/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: modelName,
+        model: "abab6.5s-chat",
         messages: [
           {
             role: "user",
-            contents: [
+            content: [
               {
                 type: "image_url",
                 image_url: {
