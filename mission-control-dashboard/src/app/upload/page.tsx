@@ -436,7 +436,20 @@ Status: ⏳ Awaiting invoice match`,
 
           // Parse with user's Excel headers
           const poNumber = headerRow.po_number || `PO${Date.now()}`;
-          const orderDate = headerRow.po_creation_date || new Date().toISOString().split('T')[0];
+          let orderDateValue = headerRow.po_creation_date;
+          // Handle date format - could be different formats
+          let orderDate = new Date().toISOString().split('T')[0];
+          if (orderDateValue) {
+            try {
+              const parsed = new Date(orderDateValue);
+              if (!isNaN(parsed.getTime())) {
+                orderDate = parsed.toISOString().split('T')[0];
+              }
+            } catch (e) {
+              console.log("Date parse error:", e);
+            }
+          }
+          
           const deliveryDate = headerRow.po_expected_delivery_at || '';
           const supplier = headerRow.supplier_name || "Unknown";
           const deliveryLocation = headerRow.store_name || "Talabat 3PL";

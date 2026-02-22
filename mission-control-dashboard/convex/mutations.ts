@@ -703,7 +703,7 @@ export const getUserByEmail = mutation({
 
 export const updateLpo = mutation({
   args: {
-    lpoId: v.id("lpo_table"),
+    lpoId: v.any(), // Accept string or Id
     customer: v.optional(v.string()),
     status: v.optional(v.string()),
     delivery_date: v.optional(v.string()),
@@ -716,14 +716,16 @@ export const updateLpo = mutation({
     if (args.delivery_date !== undefined) updateData.delivery_date = args.delivery_date;
     if (args.notes !== undefined) updateData.notes = args.notes;
     
-    await ctx.db.patch(args.lpoId, updateData);
+    // Handle both string and Id types
+    const lpoId = typeof args.lpoId === 'string' ? args.lpoId as any : args.lpoId;
+    await ctx.db.patch(lpoId, updateData);
     return { success: true };
   },
 });
 
 export const updateLpoLineItem = mutation({
   args: {
-    lineItemId: v.id("lpo_line_items"),
+    lineItemId: v.any(), // Accept string or Id
     quantity_delivered: v.optional(v.number()),
     amount_invoiced: v.optional(v.number()),
   },
@@ -732,7 +734,9 @@ export const updateLpoLineItem = mutation({
     if (args.quantity_delivered !== undefined) updateData.quantity_delivered = args.quantity_delivered;
     if (args.amount_invoiced !== undefined) updateData.amount_invoiced = args.amount_invoiced;
     
-    await ctx.db.patch(args.lineItemId, updateData);
+    // Handle both string and Id types
+    const lineItemId = typeof args.lineItemId === 'string' ? args.lineItemId as any : args.lineItemId;
+    await ctx.db.patch(lineItemId, updateData);
     return { success: true };
   },
 });
