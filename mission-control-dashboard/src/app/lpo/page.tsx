@@ -58,6 +58,7 @@ export default function LpoPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
   
   // Mutation for syncing brand performance
   const syncBrandPerformance = useMutation(api.mutations.syncBrandPerformance);
@@ -171,8 +172,8 @@ export default function LpoPage() {
         }
       }
       
-      // Sync to Brand Performance (only if invoice details provided)
-      if (editForm.invoice_number && editForm.invoice_date && lineItemsToSync.length > 0) {
+      // Sync to Brand Performance (only if user clicks sync button)
+      if (showSyncConfirm && editForm.invoice_number && editForm.invoice_date && lineItemsToSync.length > 0) {
         console.log("Syncing to Brand Performance...");
         await syncBrandPerformance({
           po_number: selectedLpoNumber || "",
@@ -185,6 +186,7 @@ export default function LpoPage() {
       
       console.log("All items saved!");
       setSaveSuccess(true);
+      setShowSyncConfirm(false);
       
       // Close modal after short delay
       setTimeout(() => {
@@ -541,8 +543,16 @@ export default function LpoPage() {
               
               {/* Buttons */}
               <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-500">
-                  Tip: Enter qty delivered → All amounts auto-calculate
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showSyncConfirm}
+                      onChange={(e) => setShowSyncConfirm(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-green-500 focus:ring-green-500"
+                    />
+                    <span>Sync to Brand Performance</span>
+                  </label>
                 </div>
                 <div className="flex gap-3">
                   <button

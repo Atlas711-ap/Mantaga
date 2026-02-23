@@ -45,10 +45,10 @@ const agents: Agent[] = [
     model: "Qwen 32B",
     status: "ACTIVE",
     responsibilities: [
-      "Sales forecasting",
-      "Budget analysis",
-      "Revenue reporting",
-      "Commission tracking"
+      "Maintain targets vs actual sales",
+      "On app marketing budgets",
+      "Promotions budgets",
+      "Never exceed 20% spend of sales"
     ],
     last_action: "Monthly report ready — Pending review"
   },
@@ -61,9 +61,10 @@ const agents: Agent[] = [
     model: "Qwen 32B",
     status: "ACTIVE",
     responsibilities: [
-      "Stock monitoring",
-      "SKU management",
-      "Brand performance",
+      "Manage customer insights",
+      "Ads performance analysis",
+      "Stock movement tracking",
+      "Customer sales by brand",
       "Coordinates sub-agents"
     ],
     last_action: "Stock alerts processed — Today"
@@ -77,41 +78,75 @@ const agents: Agent[] = [
     model: "Qwen 32B",
     status: "ACTIVE",
     responsibilities: [
-      "Volume forecasting",
-      "Inventory planning",
-      "Event adjustments",
-      "Ad performance"
+      "SKU volume forecasting by brand",
+      "Stock movement analysis",
+      "Forecast → Nexus for sales targets",
+      "Inventory planning"
     ],
     last_action: "Forecast updated — This week"
   },
+  {
+    id: "neo",
+    name: "Neo",
+    role: "IT Manager",
+    department: "Technology",
+    reports_to: "Athena",
+    model: "Qwen 32B",
+    status: "IDLE",
+    responsibilities: [
+      "Build tools and skills",
+      "Create automations for team",
+      "Improve quality of work",
+      "Simplify tasks"
+    ],
+    last_action: "Awaiting request"
+  },
+  {
+    id: "zeus",
+    name: "Zeus",
+    role: "Marketing Manager",
+    department: "Marketing",
+    reports_to: "Athena",
+    model: "Qwen 32B",
+    status: "IDLE",
+    responsibilities: [
+      "Digital marketing strategies",
+      "Brand marketing",
+      "Client acquisition",
+      "LinkedIn, X, Instagram, TikTok"
+    ],
+    last_action: "Awaiting request"
+  },
   // Level 3: Sub-agents (under Atlas)
   {
-    id: "atlas-ecoord",
-    name: "Ecommerce Coordinator",
-    role: "Sub-Agent",
+    id: "faith",
+    name: "Faith",
+    role: "Ecommerce Coordinator",
     department: "Ecommerce",
     reports_to: "Atlas",
     model: "Qwen 32B",
     status: "IDLE",
     responsibilities: [
-      "Master SKU list",
-      "Stock movement analysis",
-      "Daily stock reports"
+      "Maintain Master SKU List",
+      "Read daily stock reports",
+      "Prepare Customer Performance data",
+      "Report to Atlas"
     ],
     last_action: "Awaiting upload"
   },
   {
-    id: "atlas-pm",
-    name: "Performance Marketing",
-    role: "Sub-Agent",
+    id: "alexis",
+    name: "Alexis",
+    role: "Performance Marketing",
     department: "Ecommerce",
     reports_to: "Atlas",
     model: "Qwen 32B",
     status: "IDLE",
     responsibilities: [
-      "PPC ads management",
-      "Keyword optimization",
-      "ROAS analysis"
+      "Manage PPC campaigns on Talabat",
+      "Analyze campaign performance",
+      "Provide insights to Atlas",
+      "ROAS optimization"
     ],
     last_action: "Awaiting data"
   }
@@ -122,8 +157,10 @@ const agentColors: Record<string, string> = {
   nexus: "#06B6D4",     // Cyan
   atlas: "#10B981",     // Emerald
   forge: "#8B5CF6",     // Purple
-  "atlas-ecoord": "#10B981",
-  "atlas-pm": "#10B981"
+  neo: "#EF4444",       // Red
+  zeus: "#F97316",      // Orange
+  faith: "#10B981",     // Emerald (sub-agent of Atlas)
+  alexis: "#10B981"     // Emerald (sub-agent of Atlas)
 };
 
 export default function TeamPage() {
@@ -153,25 +190,32 @@ export default function TeamPage() {
           <div className="w-px h-4 bg-gray-600"></div>
           
           {/* Managers Row */}
-          <div className="flex gap-4 mb-4">
-            <div className="px-3 py-2 bg-cyan-500/20 border border-cyan-500 rounded-lg text-cyan-400 text-xs">
-              🔵 Nexus<br/><span className="text-gray-500">Trade Marketing</span>
+          <div className="flex gap-3 mb-4 flex-wrap justify-center">
+            <div className="px-3 py-2 bg-cyan-500/20 border border-cyan-500 rounded-lg text-cyan-400 text-xs text-center min-w-[80px]">
+              🔵 Nexus<br/><span className="text-gray-500">Trade Mktg</span>
             </div>
-            <div className="px-3 py-2 bg-emerald-500/20 border border-emerald-500 rounded-lg text-emerald-400 text-xs">
-              💚 Atlas<br/><span className="text-gray-500">Ecommerce KAM</span>
+            <div className="px-3 py-2 bg-emerald-500/20 border border-emerald-500 rounded-lg text-emerald-400 text-xs text-center min-w-[80px]">
+              💚 Atlas<br/><span className="text-gray-500">Ecommerce</span>
             </div>
-            <div className="px-3 py-2 bg-purple-500/20 border border-purple-500 rounded-lg text-purple-400 text-xs">
+            <div className="px-3 py-2 bg-purple-500/20 border border-purple-500 rounded-lg text-purple-400 text-xs text-center min-w-[80px]">
               💜 Forge<br/><span className="text-gray-500">Supply Chain</span>
+            </div>
+            <div className="px-3 py-2 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-xs text-center min-w-[80px]">
+              🔴 Neo<br/><span className="text-gray-500">IT</span>
+            </div>
+            <div className="px-3 py-2 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-400 text-xs text-center min-w-[80px]">
+              🟠 Zeus<br/><span className="text-gray-500">Marketing</span>
             </div>
           </div>
           
           {/* Atlas Sub-agents */}
-          <div className="flex gap-4">
+          <div className="w-px h-4 bg-gray-600"></div>
+          <div className="flex gap-3">
             <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/50 rounded-lg text-emerald-400/60 text-xs">
-              📦 Ecommerce Coord
+              📦 Faith<br/><span className="text-gray-500">Ecommerce Coord</span>
             </div>
             <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/50 rounded-lg text-emerald-400/60 text-xs">
-              📊 Performance Mktg
+              📊 Alexis<br/><span className="text-gray-500">Perf Marketing</span>
             </div>
           </div>
         </div>

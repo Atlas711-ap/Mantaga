@@ -25,10 +25,14 @@ interface Agent {
 }
 
 const agents: Agent[] = [
-  { id: "athena", name: "Athena", role: "CEO", color: "#F59E0B", status: "ACTIVE" },
-  { id: "nexus", name: "Nexus", role: "Operations", color: "#06B6D4", status: "ACTIVE" },
-  { id: "atlas", name: "Atlas", role: "SKU Coordinator", color: "#10B981", status: "IDLE" },
-  { id: "forge", name: "Forge", role: "Developer", color: "#8B5CF6", status: "IDLE" },
+  { id: "athena", name: "Athena", role: "CEO Agent", color: "#F59E0B", status: "ACTIVE" },
+  { id: "nexus", name: "Nexus", role: "Trade Marketing Manager", color: "#06B6D4", status: "ACTIVE" },
+  { id: "atlas", name: "Atlas", role: "Ecommerce KAM", color: "#10B981", status: "ACTIVE" },
+  { id: "forge", name: "Forge", role: "Supply Chain Manager", color: "#8B5CF6", status: "ACTIVE" },
+  { id: "neo", name: "Neo", role: "IT Manager", color: "#EF4444", status: "IDLE" },
+  { id: "zeus", name: "Zeus", role: "Marketing Manager", color: "#F97316", status: "IDLE" },
+  { id: "faith", name: "Faith", role: "Ecommerce Coordinator", color: "#10B981", status: "IDLE" },
+  { id: "alexis", name: "Alexis", role: "Performance Marketing", color: "#10B981", status: "IDLE" },
 ];
 
 const recentActivity = [
@@ -40,9 +44,14 @@ const recentActivity = [
 ];
 
 const quickActions = [
-  { label: "📊 Ask for stock update", prompt: "@nexus What is the current stock status across all darkstores?" },
-  { label: "📋 Ask for SKU check", prompt: "@atlas Are there any incomplete SKU records?" },
-  { label: "🔍 Ask for daily summary", prompt: "@athena Give me a quick summary of today's operations" },
+  { label: "📊 Ask Nexus (Sales)", prompt: "@nexus What is the current sales vs target status?" },
+  { label: "📦 Ask Atlas (Ecommerce)", prompt: "@atlas Show me the stock movement summary" },
+  { label: "🔮 Ask Forge (Forecasting)", prompt: "@forge What is the volume forecast for next month?" },
+  { label: "🛠️ Ask Neo (IT)", prompt: "@neo Build a tool to automate daily reports" },
+  { label: "📢 Ask Zeus (Marketing)", prompt: "@zeus What is our brand marketing strategy?" },
+  { label: "📋 Ask Faith (SKU)", prompt: "@faith Check the Master SKU List for missing fields" },
+  { label: "📈 Ask Alexis (Ads)", prompt: "@alexis What is the PPC performance on Talabat?" },
+  { label: "🎯 Ask Athena (CEO)", prompt: "@athena Give me a summary of today's operations" },
 ];
 
 export default function ChatroomPage() {
