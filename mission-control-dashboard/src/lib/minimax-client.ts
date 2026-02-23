@@ -1,22 +1,19 @@
 // MiniMax AI Client
 // Handles API calls to MiniMax for AI agent responses
 
-// Client-side needs NEXT_PUBLIC_ prefix
 const MINIMAX_API_KEY = process.env.NEXT_PUBLIC_MINIMAX_API_KEY || process.env.MINIMAX_API_KEY;
 const MINIMAX_BASE_URL = "https://api.minimax.chat/v1";
 
-console.log("MiniMax env check - NEXT_PUBLIC:", !!process.env.NEXT_PUBLIC_MINIMAX_API_KEY, "DEFAULT:", !!process.env.MINIMAX_API_KEY);
-
-// Model configurations
+// Model configurations - MiniMax uses these model names
 export const AGENT_MODELS = {
-  athena: "MiniMax_M2.5",  // CEO - strategic
-  nexus: "Qwen_32B",        // Trade Marketing - analysis
-  atlas: "Qwen_32B",       // Ecommerce - data
-  forge: "Qwen_32B",       // Supply Chain - forecasting
-  neo: "Qwen_32B",         // IT - building
-  zeus: "Qwen_32B",        // Marketing - strategy
-  faith: "Qwen_32B",       // Ecommerce Coordinator - data entry
-  alexis: "Qwen_32B",      // Performance Marketing - ads
+  athena: "MiniMax-M2.5-200k",  // CEO - strategic
+  nexus: "abab6.5s-chat",        // Trade Marketing - analysis  
+  atlas: "abab6.5s-chat",       // Ecommerce - data
+  forge: "abab6.5s-chat",       // Supply Chain - forecasting
+  neo: "abab6.5s-chat",         // IT - building
+  zeus: "abab6.5s-chat",        // Marketing - strategy
+  faith: "abab6.5s-chat",       // Ecommerce Coordinator - data entry
+  alexis: "abab6.5s-chat",      // Performance Marketing - ads
 };
 
 export interface ChatMessage {
@@ -33,38 +30,54 @@ export interface ChatCompletionRequest {
 
 export async function callMiniMax(
   messages: ChatMessage[],
-  model: string = "MiniMax_M2.5"
+  model: string = "MiniMax-M2.5-200k"
 ): Promise<string> {
   if (!MINIMAX_API_KEY) {
-    throw new Error("MINIMAX_API_KEY not configured");
+    throw new Error("MINIMAX_API_KEY not configured - add NEXT_PUBLIC_MINIMAX_API_KEY to Vercel env vars");
   }
 
-  const response = await fetch(`${MINIMAX_BASE_URL}/text/chatcompletion_v2`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${MINIMAX_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-      max_tokens: 2048,
-    } as ChatCompletionRequest),
-  });
+  console.log("Calling MiniMax with model:", model);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`MiniMax API error: ${response.status} - ${error}`);
-  }
+  try {
+    const response = await fetch(`${MINIMAX_BASE_URL}/text/chatcompletion_v2`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${MINIMAX_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+        max_tokens: 2048,
+      }),
+    });
 
-  const data = await response.json();
-  
-  if (data.choices && data.choices[0] && data.choices[0].message) {
-    return data.choices[0].message.content;
+    console.log("MiniMax response status:", response.status);
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("MiniMax API error:", response.status, error);
+      throw new Error(`MiniMax API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    console.log("MiniMax response data:", JSON.stringify(data).substring(0, 200));
+    
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return data.choices[0].message.content;
+    }
+    
+    if (data.reply) {
+      return data.reply;
+    }
+    
+    console.error("Unexpected MiniMax response structure:", data);
+    throw new Error("Invalid response from MiniMax API - no content found");
+  } catch (error: any) {
+    console.error("MiniMax call failed:", error.message);
+    throw error;
   }
-  
-  throw new Error("Invalid response from MiniMax API");
 }
 
 // Build context for inter-agent communication
@@ -173,7 +186,7 @@ Respond in your role as ${agentId}. If you need input from another agent, @menti
 // Get team status for context
 export function getTeamContext(): string {
   return `Team Status:
-- Athena: CEO Agent (ACTIVE)
+- Athena: CEO Agent (ACTIVE) - MiniMax M2.5
 - Nexus: Trade Marketing Manager (ACTIVE)
 - Atlas: Ecommerce KAM (ACTIVE)
 - Forge: Supply Chain Manager (ACTIVE)

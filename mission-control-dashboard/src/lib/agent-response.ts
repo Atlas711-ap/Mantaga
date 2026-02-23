@@ -81,20 +81,19 @@ export async function routeToAgent(
     const messages = buildAgentContext(agentId, message, knowledgeBase, teamContext);
     
     // Get the right model for this agent
-    const model = AGENT_MODELS[agentId as keyof typeof AGENT_MODELS] || "MiniMax_M2.5";
+    const model = AGENT_MODELS[agentId as keyof typeof AGENT_MODELS] || "MiniMax-M2.5-200k";
     
     console.log(`Calling MiniMax for ${agentId} with model ${model}...`);
     
     // Call MiniMax API
     const response = await callMiniMax(messages, model);
-    console.log(`Got response from ${agentId}`);
+    console.log(`Got response from ${agentId}:`, response.substring(0, 100));
     return response;
   } catch (error: any) {
     console.error("Agent response error:", error);
     
-    // Return mock if API fails, with error note
-    const mockResponse = generateMockResponse(agentId, message);
-    return `${mockResponse}\n\n⚠️ Note: AI response unavailable (using fallback). Error: ${error.message}`;
+    // Return a clear error message instead of mock
+    return `⚠️ Unable to connect to AI. Please check:\n1. Is NEXT_PUBLIC_MINIMAX_API_KEY set in Vercel env vars?\n2. Is the API key valid?\n\nError: ${error.message}`;
   }
 }
 
