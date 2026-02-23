@@ -116,14 +116,14 @@ export default function LpoPage() {
       
       // Update each line item
       for (const item of editLineItems) {
-        if (item.quantity_delivered && item.quantity_delivered > 0) {
+        if (item.quantity_delivered && Number(item.quantity_delivered) > 0) {
           console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced, item.vat_amount_invoiced, item.total_incl_vat_invoiced);
           await updateLpoLineItem({
             lineItemId: item._id,
-            quantity_delivered: item.quantity_delivered,
-            amount_invoiced: item.amount_invoiced,
-            vat_amount_invoiced: item.vat_amount_invoiced,
-            total_incl_vat_invoiced: item.total_incl_vat_invoiced,
+            quantity_delivered: Number(item.quantity_delivered),
+            amount_invoiced: Number(item.amount_invoiced),
+            vat_amount_invoiced: Number(item.vat_amount_invoiced),
+            total_incl_vat_invoiced: Number(item.total_incl_vat_invoiced),
           });
         }
       }
