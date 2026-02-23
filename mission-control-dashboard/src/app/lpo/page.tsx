@@ -231,6 +231,7 @@ export default function LpoPage() {
               <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
               <th className="px-3 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">LPO Amount</th>
               <th className="px-3 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">Invoiced Amt</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">Service Level %</th>
               <th className="px-3 py-3 text-right text-sm font-medium text-purple-600 dark:text-purple-400">Comm %</th>
               <th className="px-3 py-3 text-right text-sm font-medium text-purple-600 dark:text-purple-400">Comm Amount</th>
             </tr>
@@ -261,6 +262,19 @@ export default function LpoPage() {
                 <td className="px-3 py-3 text-right text-green-600 dark:text-green-400 font-medium">
                   {totals.invoicedAmt > 0 ? totals.invoicedAmt.toLocaleString() : '-'}
                 </td>
+                <td className="px-3 py-3 text-right">
+                  {totals.invoicedAmt > 0 && lpo.total_incl_vat ? (
+                    <span className={`font-medium ${
+                      (totals.invoicedAmt / lpo.total_incl_vat) >= 1 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : (totals.invoicedAmt / lpo.total_incl_vat) >= 0.8
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {((totals.invoicedAmt / lpo.total_incl_vat) * 100).toFixed(1)}%
+                    </span>
+                  ) : '-'}
+                </td>
                 <td className="px-3 py-3 text-right text-purple-600 dark:text-purple-400">
                   {lpo.commission_pct ? `${lpo.commission_pct}%` : '-'}
                 </td>
@@ -272,7 +286,7 @@ export default function LpoPage() {
             })}
             {sortedLpos.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
                   No LPOs yet. Upload an Excel file to add LPOs.
                 </td>
               </tr>
