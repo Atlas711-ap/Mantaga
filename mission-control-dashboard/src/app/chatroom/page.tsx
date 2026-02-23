@@ -225,6 +225,9 @@ export default function ChatroomPage() {
                   <div className="text-right mb-1">
                     <span className="text-xs text-amber-400 font-medium">Anush</span>
                   </div>
+                  <div className="bg-blue-600 text-white rounded-lg rounded-br-sm px-4 py-2 text-right">
+                    {msg.content}
+                  </div>
                   <div className="text-right mt-1">
                     <span className="text-xs text-slate-500">{msg.timestamp}</span>
                   </div>
