@@ -153,6 +153,12 @@ export const getLpoLineItemsByPoNumber = query({
   },
 });
 
+export const getLpoLineItemsTable = query({
+  handler: async (ctx) => {
+    return await ctx.db.query("lpo_line_items").collect();
+  },
+});
+
 // ============ INVOICE_TABLE ============
 
 export const getInvoiceTable = query({

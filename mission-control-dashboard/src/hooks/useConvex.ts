@@ -83,6 +83,10 @@ export function useLpoLineItemsByPoNumber(po_number: string) {
   return useQuery(api.queries.getLpoLineItemsByPoNumber, { po_number });
 }
 
+export function useLpoLineItemsTable() {
+  return useQuery(api.queries.getLpoLineItemsTable);
+}
+
 export function useInsertLpoLineItems() {
   return useMutation(api.mutations.insertLpoLineItems);
 }

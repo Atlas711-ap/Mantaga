@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useLpoTable, useInsertLpoTable, useInsertLpoLineItems, useLpoLineItemsByPoNumber, useUpdateLpo, useUpdateLpoLineItem } from "../../hooks/useConvex";
+import { useLpoTable, useInsertLpoTable, useInsertLpoLineItems, useLpoLineItemsByPoNumber, useUpdateLpo, useUpdateLpoLineItem, useLpoLineItemsTable } from "../../hooks/useConvex";
 import { useSession } from "next-auth/react";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -27,6 +27,7 @@ interface LpoLineItem {
 export default function LpoPage() {
   const { data: session } = useSession();
   const lpos = useLpoTable();
+  const allLineItems = useLpoLineItemsTable();
   const updateLpo = useUpdateLpo();
   const updateLpoLineItem = useUpdateLpoLineItem();
   
@@ -194,6 +195,20 @@ export default function LpoPage() {
     );
   }, [lpos]);
 
+  // Calculate totals per LPO from line items
+  const lpoTotals = useMemo(() => {
+    const totals: Record<string, { invoicedAmt: number; commissionAmt: number }> = {};
+    if (!allLineItems || !lpos) return totals;
+    
+    for (const lpo of lpos) {
+      const items = allLineItems.filter((item: LpoLineItem) => item.po_number === lpo.po_number);
+      const invoicedAmt = items.reduce((sum, item) => sum + (item.total_incl_vat_invoiced || 0), 0);
+      const commissionAmt = invoicedAmt * ((lpo.commission_pct || 0) / 100);
+      totals[lpo.po_number] = { invoicedAmt, commissionAmt };
+    }
+    return totals;
+  }, [allLineItems, lpos]);
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -222,14 +237,7 @@ export default function LpoPage() {
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {sortedLpos.map((lpo) => {
-              // Calculate total invoiced from line items
-              const lpoInvoiced = lpos?.reduce((sum, l) => {
-                if (l.po_number === lpo.po_number) {
-                  // We need to get line items for this - for now show 0 if not calculated
-                  return sum;
-                }
-                return sum;
-              }, 0) || 0;
+              const totals = lpoTotals[lpo.po_number] || { invoicedAmt: 0, commissionAmt: 0 };
               
               return (
               <tr 
@@ -251,15 +259,13 @@ export default function LpoPage() {
                   {lpo.total_incl_vat?.toLocaleString() || '0'}
                 </td>
                 <td className="px-3 py-3 text-right text-green-600 dark:text-green-400 font-medium">
-                  {(lpo as any).commission_amount ? 
-                    ((lpo.total_incl_vat || 0) + (lpo.commission_amount || 0)).toLocaleString() : 
-                    '-'}
+                  {totals.invoicedAmt > 0 ? totals.invoicedAmt.toLocaleString() : '-'}
                 </td>
                 <td className="px-3 py-3 text-right text-purple-600 dark:text-purple-400">
                   {lpo.commission_pct ? `${lpo.commission_pct}%` : '-'}
                 </td>
                 <td className="px-3 py-3 text-right text-purple-600 dark:text-purple-400 font-medium">
-                  {lpo.commission_amount ? lpo.commission_amount.toLocaleString() : '-'}
+                  {totals.commissionAmt > 0 ? totals.commissionAmt.toLocaleString() : '-'}
                 </td>
               </tr>
               );
