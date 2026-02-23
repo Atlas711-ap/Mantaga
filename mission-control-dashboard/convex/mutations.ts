@@ -570,27 +570,42 @@ export const processInvoiceWithLpoMatch = mutation({
     const lpoValueExclVat = lpoHeader?.total_excl_vat || args.subtotal;
     const lpoValueInclVat = lpoHeader?.total_incl_vat || args.grand_total;
 
-    // Insert brand performance record
+    // Insert brand performance record (at SKU level - create one record per line item)
     const now = new Date();
-    await ctx.db.insert("brand_performance", {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-      po_number: args.po_number,
-      po_date: lpoHeader?.order_date || args.invoice_date,
-      customer: args.customer,
-      brand: lpoHeader?.brand,
-      client: lpoHeader?.client,
-      invoice_number: args.invoice_number,
-      invoice_date: args.invoice_date,
-      lpo_value_excl_vat: lpoValueExclVat,
-      lpo_value_incl_vat: lpoValueInclVat,
-      invoiced_value_excl_vat: args.subtotal,
-      invoiced_value_incl_vat: args.grand_total,
-      gap_value: gapValue,
-      service_level_pct: serviceLevelPct,
-      commission_aed: commissionAed,
-      match_status: matchStatus,
-    });
+    const invoiceLineItems = await ctx.db
+      .query("invoice_line_items")
+      .filter((q) => q.eq(q.field("invoice_number"), args.invoice_number))
+      .collect();
+    
+    for (const lineItem of invoiceLineItems) {
+      await ctx.db.insert("brand_performance", {
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        po_number: args.po_number,
+        po_date: lpoHeader?.order_date || args.invoice_date,
+        customer: args.customer,
+        brand: lpoHeader?.brand,
+        client: lpoHeader?.client,
+        invoice_number: args.invoice_number,
+        invoice_date: args.invoice_date,
+        barcode: lineItem.barcode,
+        product_name: lineItem.product_name,
+        quantity_ordered: 0, // Not available from invoice
+        quantity_delivered: lineItem.quantity_invoiced,
+        unit_cost: lineItem.unit_rate,
+        lpo_value_excl_vat: lpoValueExclVat / (invoiceLineItems.length || 1),
+        lpo_value_incl_vat: lpoValueInclVat / (invoiceLineItems.length || 1),
+        invoiced_value_excl_vat: lineItem.taxable_amount,
+        invoiced_value_incl_vat: lineItem.taxable_amount + lineItem.vat_amount,
+        vat_amount_invoiced: lineItem.vat_amount,
+        total_incl_vat_invoiced: lineItem.taxable_amount + lineItem.vat_amount,
+        gap_value: 0,
+        service_level_pct: 100, // Assume full for invoice-based
+        commission_pct: 0,
+        commission_aed: 0,
+        match_status: "MATCHED",
+      });
+    }
 
     return {
       invoice_number: args.invoice_number,
