@@ -1,7 +1,5 @@
 // Agent Response System
-// Routes messages to correct agents via server-side API
-
-import { AGENT_MODELS, getTeamContext } from "./minimax-client";
+// Routes messages to OpenClaw sub-agents
 
 // Detect which agent is mentioned in message
 export function detectAgentMention(message: string): string | null {
@@ -9,22 +7,22 @@ export function detectAgentMention(message: string): string | null {
   return mentionMatch ? mentionMatch[1].toLowerCase() : null;
 }
 
-// Get agent config by ID
+// Get agent config
 export function getAgentConfig(agentId: string) {
-  const configs: Record<string, { name: string; role: string; model: string; scope: string }> = {
-    athena: { name: "Athena", role: "CEO Agent", model: "MiniMax-M2.5-200k", scope: "Daily summary briefs to Anush, coordinates all agents, strategic decisions" },
-    nexus: { name: "Nexus", role: "Trade Marketing Manager", model: "abab6.5s-chat", scope: "Targets vs actual sales, on app marketing budgets, promotions (≤20% of sales)" },
-    atlas: { name: "Atlas", role: "Ecommerce KAM", model: "abab6.5s-chat", scope: "Customer insights, ads performance, stock movement, sales by brand" },
-    forge: { name: "Forge", role: "Supply Chain Manager", model: "abab6.5s-chat", scope: "SKU volume forecasting by brand, stock movement → Nexus for targets" },
-    neo: { name: "Neo", role: "IT Manager", model: "abab6.5s-chat", scope: "Build tools and skills for team, automations, code" },
-    zeus: { name: "Zeus", role: "Marketing Manager", model: "abab6.5s-chat", scope: "Digital marketing, brand marketing, client acquisition, LinkedIn/X/Instagram/TikTok" },
-    faith: { name: "Faith", role: "Ecommerce Coordinator", model: "abab6.5s-chat", scope: "Master SKU List, daily stock reports, Customer Performance data → Atlas" },
-    alexis: { name: "Alexis", role: "Performance Marketing", model: "abab6.5s-chat", scope: "PPC campaigns Talabat, analyze, provide insights to Atlas" },
+  const configs: Record<string, { name: string; role: string; model: string }> = {
+    athena: { name: "Athena", role: "CEO Agent", model: "MiniMax-M2.5" },
+    nexus: { name: "Nexus", role: "Trade Marketing Manager", model: "MiniMax-M2.5" },
+    atlas: { name: "Atlas", role: "Ecommerce KAM", model: "MiniMax-M2.5" },
+    forge: { name: "Forge", role: "Supply Chain Manager", model: "Qwen 32B" },
+    neo: { name: "Neo", role: "IT Manager", model: "Qwen 32B" },
+    zeus: { name: "Zeus", role: "Marketing Manager", model: "Qwen 32B" },
+    faith: { name: "Faith", role: "Ecommerce Coordinator", model: "Qwen 32B" },
+    alexis: { name: "Alexis", role: "Performance Marketing", model: "Qwen 32B" },
   };
   return configs[agentId] || null;
 }
 
-// Route message to appropriate agent and get response
+// Route message to appropriate OpenClaw agent
 export async function routeToAgent(
   message: string,
   agentId: string,
@@ -36,8 +34,8 @@ export async function routeToAgent(
   }
 
   try {
-    // Call our server-side API route
-    const apiResponse = await fetch("/api/agent", {
+    // Call our OpenClaw API
+    const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/openclaw`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -45,7 +43,6 @@ export async function routeToAgent(
       body: JSON.stringify({
         agentId,
         message,
-        knowledgeBase,
       }),
     });
 
@@ -58,6 +55,6 @@ export async function routeToAgent(
     return data.response;
   } catch (error: any) {
     console.error("Agent response error:", error);
-    return `⚠️ Unable to connect to AI service.\n\nError: ${error.message}\n\nPlease ensure MINIMAX_API_KEY is set in Vercel environment variables.`;
+    return `⚠️ Unable to connect to ${agentConfig.name}.\n\nError: ${error.message}\n\nMake sure OpenClaw is running.`;
   }
 }
