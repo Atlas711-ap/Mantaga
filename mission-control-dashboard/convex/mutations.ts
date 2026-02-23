@@ -384,20 +384,31 @@ export const insertBrandPerformance = mutation({
     client: v.optional(v.string()),
     invoice_number: v.string(),
     invoice_date: v.string(),
+    barcode: v.string(),
+    product_name: v.string(),
+    quantity_ordered: v.number(),
+    quantity_delivered: v.number(),
+    unit_cost: v.number(),
     lpo_value_excl_vat: v.number(),
     lpo_value_incl_vat: v.number(),
     invoiced_value_excl_vat: v.number(),
     invoiced_value_incl_vat: v.number(),
+    vat_amount_invoiced: v.optional(v.number()),
+    total_incl_vat_invoiced: v.optional(v.number()),
     gap_value: v.number(),
     service_level_pct: v.number(),
+    commission_pct: v.optional(v.number()),
     commission_aed: v.number(),
     match_status: v.string(),
   },
   handler: async (ctx, args) => {
-    // Check if already exists for this PO
+    // Check if already exists for this PO and barcode
     const existing = await ctx.db
       .query("brand_performance")
-      .filter((q) => q.eq(q.field("po_number"), args.po_number))
+      .filter((q) => q.and(
+        q.eq(q.field("po_number"), args.po_number),
+        q.eq(q.field("barcode"), args.barcode)
+      ))
       .first();
     
     if (existing) {
@@ -831,7 +842,7 @@ export const syncBrandPerformance = mutation({
         invoiced_value_incl_vat: item.total_incl_vat_invoiced || 0,
         vat_amount_invoiced: item.vat_amount_invoiced,
         total_incl_vat_invoiced: item.total_incl_vat_invoiced,
-        gap_value,
+        gap_value: gapValue,
         service_level_pct: serviceLevelPct,
         commission_pct: commissionPct,
         commission_aed: commissionAed,
