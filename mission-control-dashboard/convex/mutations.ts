@@ -710,6 +710,8 @@ export const updateLpo = mutation({
     notes: v.optional(v.string()),
     commission_pct: v.optional(v.number()),
     commission_amount: v.optional(v.number()),
+    invoice_number: v.optional(v.string()),
+    invoice_date: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const updateData: any = {};
@@ -719,6 +721,8 @@ export const updateLpo = mutation({
     if (args.notes !== undefined) updateData.notes = args.notes;
     if (args.commission_pct !== undefined) updateData.commission_pct = args.commission_pct;
     if (args.commission_amount !== undefined) updateData.commission_amount = args.commission_amount;
+    if (args.invoice_number !== undefined) updateData.invoice_number = args.invoice_number;
+    if (args.invoice_date !== undefined) updateData.invoice_date = args.invoice_date;
     
     // Handle both string and Id types
     const lpoId = typeof args.lpoId === 'string' ? args.lpoId as any : args.lpoId;
@@ -746,5 +750,95 @@ export const updateLpoLineItem = mutation({
     const lineItemId = typeof args.lineItemId === 'string' ? args.lineItemId as any : args.lineItemId;
     await ctx.db.patch(lineItemId, updateData);
     return { success: true };
+  },
+});
+
+// ============ BRAND_PERFORMANCE SYNC ============
+
+export const syncBrandPerformance = mutation({
+  args: {
+    po_number: v.string(),
+    invoice_number: v.string(),
+    invoice_date: v.string(),
+    lineItems: v.array(v.object({
+      barcode: v.string(),
+      product_name: v.string(),
+      quantity_ordered: v.number(),
+      quantity_delivered: v.number(),
+      unit_cost: v.number(),
+      amount_incl_vat: v.number(),
+      amount_invoiced: v.number(),
+      vat_amount_invoiced: v.number(),
+      total_incl_vat_invoiced: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const { po_number, invoice_number, invoice_date, lineItems } = args;
+    
+    // Get LPO header info
+    const lpo = await ctx.db
+      .query("lpo_table")
+      .withIndex("by_po_number", (q) => q.eq("po_number", po_number))
+      .first();
+    
+    if (!lpo) {
+      throw new Error(`LPO ${po_number} not found`);
+    }
+    
+    const orderDate = new Date(lpo.order_date);
+    const year = orderDate.getFullYear();
+    const month = orderDate.getMonth() + 1;
+    const commissionPct = lpo.commission_pct || 0;
+    
+    // Delete existing records for this PO
+    const existing = await ctx.db
+      .query("brand_performance")
+      .filter((q) => q.eq(q.field("po_number"), po_number))
+      .collect();
+    
+    for (const record of existing) {
+      await ctx.db.delete(record._id);
+    }
+    
+    // Insert new records for each line item
+    for (const item of lineItems) {
+      const serviceLevelPct = item.quantity_ordered > 0 
+        ? (item.quantity_delivered / item.quantity_ordered) * 100 
+        : 0;
+      const gapValue = item.quantity_ordered - item.quantity_delivered;
+      const commissionAed = item.total_incl_vat_invoiced 
+        ? item.total_incl_vat_invoiced * (commissionPct / 100) 
+        : 0;
+      
+      await ctx.db.insert("brand_performance", {
+        year,
+        month,
+        po_number,
+        po_date: lpo.order_date,
+        customer: lpo.customer,
+        brand: lpo.brand,
+        client: lpo.client,
+        invoice_number,
+        invoice_date,
+        barcode: item.barcode,
+        product_name: item.product_name,
+        quantity_ordered: item.quantity_ordered,
+        quantity_delivered: item.quantity_delivered,
+        unit_cost: item.unit_cost,
+        lpo_value_excl_vat: item.amount_incl_vat / 1.05,
+        lpo_value_incl_vat: item.amount_incl_vat,
+        invoiced_value_excl_vat: item.amount_invoiced,
+        invoiced_value_incl_vat: item.total_incl_vat_invoiced || 0,
+        vat_amount_invoiced: item.vat_amount_invoiced,
+        total_incl_vat_invoiced: item.total_incl_vat_invoiced,
+        gap_value,
+        service_level_pct: serviceLevelPct,
+        commission_pct: commissionPct,
+        commission_aed: commissionAed,
+        match_status: Math.abs(gapValue) <= 2 ? "MATCHED" : "DISCREPANCY",
+      });
+    }
+    
+    return { success: true, count: lineItems.length };
   },
 });

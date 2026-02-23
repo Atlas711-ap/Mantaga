@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useLpoTable, useInsertLpoTable, useInsertLpoLineItems, useLpoLineItemsByPoNumber, useUpdateLpo, useUpdateLpoLineItem, useLpoLineItemsTable } from "../../hooks/useConvex";
+import { useMutation } from "../../hooks/useConvex";
+import { api } from "../../../convex/_generated/api";
 import { useSession } from "next-auth/react";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -47,6 +49,8 @@ export default function LpoPage() {
     delivery_date: "",
     status: "pending",
     commission_pct: 0,
+    invoice_number: "",
+    invoice_date: "",
   });
   
   // Line items with editable delivery
@@ -54,6 +58,9 @@ export default function LpoPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Mutation for syncing brand performance
+  const syncBrandPerformance = useMutation(api.mutations.syncBrandPerformance);
   
   // Load data when LPO is selected
   useEffect(() => {
@@ -63,6 +70,8 @@ export default function LpoPage() {
         delivery_date: selectedLpo.delivery_date || "",
         status: selectedLpo.status || "pending",
         commission_pct: selectedLpo.commission_pct || 0,
+        invoice_number: (selectedLpo as any).invoice_number || "",
+        invoice_date: (selectedLpo as any).invoice_date || "",
       });
     }
   }, [selectedLpo]);
@@ -113,7 +122,14 @@ export default function LpoPage() {
       console.log("Form data:", editForm);
       console.log("Commission:", commissionPct, "% =", commissionAmount);
       
-      // Update LPO header with commission
+      // Validate required invoice fields
+      if (!editForm.invoice_number || !editForm.invoice_date) {
+        setSaveError("Invoice Number and Invoice Date are required");
+        setSaving(false);
+        return;
+      }
+      
+      // Update LPO header with commission and invoice details
       await updateLpo({
         lpoId: selectedLpoId,
         customer: editForm.customer,
@@ -121,11 +137,14 @@ export default function LpoPage() {
         status: editForm.status,
         commission_pct: Number(commissionPct),
         commission_amount: Number(commissionAmount),
+        invoice_number: editForm.invoice_number,
+        invoice_date: editForm.invoice_date,
       });
       
       console.log("Header saved, updating line items...");
       
       // Update each line item
+      const lineItemsToSync = [];
       for (const item of editLineItems) {
         if (item.quantity_delivered && Number(item.quantity_delivered) > 0) {
           console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced, item.vat_amount_invoiced, item.total_incl_vat_invoiced);
@@ -136,7 +155,32 @@ export default function LpoPage() {
             vat_amount_invoiced: Number(item.vat_amount_invoiced),
             total_incl_vat_invoiced: Number(item.total_incl_vat_invoiced),
           });
+          
+          // Collect for brand performance sync
+          lineItemsToSync.push({
+            barcode: item.barcode,
+            product_name: item.product_name,
+            quantity_ordered: item.quantity_ordered,
+            quantity_delivered: item.quantity_delivered,
+            unit_cost: item.unit_cost,
+            amount_incl_vat: item.amount_incl_vat,
+            amount_invoiced: item.amount_invoiced || 0,
+            vat_amount_invoiced: item.vat_amount_invoiced || 0,
+            total_incl_vat_invoiced: item.total_incl_vat_invoiced || 0,
+          });
         }
+      }
+      
+      // Sync to Brand Performance (only if invoice details provided)
+      if (editForm.invoice_number && editForm.invoice_date && lineItemsToSync.length > 0) {
+        console.log("Syncing to Brand Performance...");
+        await syncBrandPerformance({
+          po_number: selectedLpoNumber || "",
+          invoice_number: editForm.invoice_number,
+          invoice_date: editForm.invoice_date,
+          lineItems: lineItemsToSync,
+        });
+        console.log("Brand Performance synced!");
       }
       
       console.log("All items saved!");
@@ -317,7 +361,7 @@ export default function LpoPage() {
             
             {/* Editable Header Fields */}
             <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
                   <input
@@ -361,6 +405,29 @@ export default function LpoPage() {
                     onChange={(e) => setEditForm({...editForm, commission_pct: parseFloat(e.target.value) || 0})}
                     className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                     placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-green-600 dark:text-green-400 mb-1">Invoice Number *</label>
+                  <input
+                    type="text"
+                    value={editForm.invoice_number}
+                    onChange={(e) => setEditForm({...editForm, invoice_number: e.target.value})}
+                    className="w-full px-3 py-2 border border-green-300 dark:border-green-600 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                    placeholder="INV-001"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-green-600 dark:text-green-400 mb-1">Invoice Date *</label>
+                  <input
+                    type="date"
+                    value={editForm.invoice_date}
+                    onChange={(e) => setEditForm({...editForm, invoice_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-green-300 dark:border-green-600 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                    required
                   />
                 </div>
                 <div>

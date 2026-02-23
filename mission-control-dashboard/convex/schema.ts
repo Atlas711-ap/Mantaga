@@ -75,6 +75,8 @@ export default defineSchema({
     status: v.optional(v.string()), // pending, partial, complete
     commission_pct: v.optional(v.number()), // Commission percentage
     commission_amount: v.optional(v.number()), // Commission amount (total_invoiced * commission_pct)
+    invoice_number: v.optional(v.string()),
+    invoice_date: v.optional(v.string()),
   }).index("by_po_number", ["po_number"]).index("by_brand", ["brand"]).index("by_customer", ["customer"]),
 
   lpo_line_items: defineTable({
@@ -130,15 +132,23 @@ export default defineSchema({
     client: v.optional(v.string()),
     invoice_number: v.string(),
     invoice_date: v.string(),
+    barcode: v.string(),
+    product_name: v.string(),
+    quantity_ordered: v.number(),
+    quantity_delivered: v.number(),
+    unit_cost: v.number(),
     lpo_value_excl_vat: v.number(),
     lpo_value_incl_vat: v.number(),
     invoiced_value_excl_vat: v.number(),
     invoiced_value_incl_vat: v.number(),
+    vat_amount_invoiced: v.optional(v.number()),
+    total_incl_vat_invoiced: v.optional(v.number()),
     gap_value: v.number(),
     service_level_pct: v.number(),
+    commission_pct: v.optional(v.number()),
     commission_aed: v.number(),
     match_status: v.string(),
-  }).index("by_year_month", ["year", "month"]).index("by_brand", ["brand"]).index("by_customer", ["customer"]),
+  }).index("by_year_month", ["year", "month"]).index("by_brand", ["brand"]).index("by_customer", ["customer"]).index("by_barcode", ["barcode"]),
 
   agent_event_log: defineTable({
     agent: v.string(),
