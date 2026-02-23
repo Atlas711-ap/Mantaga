@@ -73,6 +73,8 @@ export default defineSchema({
     total_vat: v.number(),
     total_incl_vat: v.number(),
     status: v.optional(v.string()), // pending, partial, complete
+    commission_pct: v.optional(v.number()), // Commission percentage
+    commission_amount: v.optional(v.number()), // Commission amount (total_invoiced * commission_pct)
   }).index("by_po_number", ["po_number"]).index("by_brand", ["brand"]).index("by_customer", ["customer"]),
 
   lpo_line_items: defineTable({

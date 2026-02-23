@@ -708,6 +708,8 @@ export const updateLpo = mutation({
     status: v.optional(v.string()),
     delivery_date: v.optional(v.string()),
     notes: v.optional(v.string()),
+    commission_pct: v.optional(v.number()),
+    commission_amount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const updateData: any = {};
@@ -715,6 +717,8 @@ export const updateLpo = mutation({
     if (args.status !== undefined) updateData.status = args.status;
     if (args.delivery_date !== undefined) updateData.delivery_date = args.delivery_date;
     if (args.notes !== undefined) updateData.notes = args.notes;
+    if (args.commission_pct !== undefined) updateData.commission_pct = args.commission_pct;
+    if (args.commission_amount !== undefined) updateData.commission_amount = args.commission_amount;
     
     // Handle both string and Id types
     const lpoId = typeof args.lpoId === 'string' ? args.lpoId as any : args.lpoId;

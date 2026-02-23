@@ -45,6 +45,7 @@ export default function LpoPage() {
     customer: "",
     delivery_date: "",
     status: "pending",
+    commission_pct: 0,
   });
   
   // Line items with editable delivery
@@ -60,6 +61,7 @@ export default function LpoPage() {
         customer: selectedLpo.customer || "",
         delivery_date: selectedLpo.delivery_date || "",
         status: selectedLpo.status || "pending",
+        commission_pct: selectedLpo.commission_pct || 0,
       });
     }
   }, [selectedLpo]);
@@ -101,15 +103,23 @@ export default function LpoPage() {
     setSaveSuccess(false);
     
     try {
+      // Calculate totals for commission
+      const grandTotal = totals.grandTotal;
+      const commissionPct = editForm.commission_pct || 0;
+      const commissionAmount = grandTotal * (commissionPct / 100);
+      
       console.log("Saving LPO ID:", selectedLpoId);
       console.log("Form data:", editForm);
+      console.log("Commission:", commissionPct, "% =", commissionAmount);
       
-      // Update LPO header
+      // Update LPO header with commission
       await updateLpo({
         lpoId: selectedLpoId,
         customer: editForm.customer,
         delivery_date: editForm.delivery_date,
         status: editForm.status,
+        commission_pct: Number(commissionPct),
+        commission_amount: Number(commissionAmount),
       });
       
       console.log("Header saved, updating line items...");
@@ -163,6 +173,9 @@ export default function LpoPage() {
     return { orderedTotal, invoicedTotal, vatTotal, grandTotal };
   }, [editLineItems]);
   
+  // Calculate commission amount
+  const commissionAmount = totals.grandTotal * (editForm.commission_pct / 100);
+  
   // Get status color
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -195,40 +208,65 @@ export default function LpoPage() {
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">PO Number</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">PO Date</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Delivery Date</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Customer</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Supplier</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Value (AED)</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">PO Number</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">PO Date</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Delivery Date</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Customer</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Supplier</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">LPO Amount</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">Invoiced Amt</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-purple-600 dark:text-purple-400">Comm %</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-purple-600 dark:text-purple-400">Comm Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {sortedLpos.map((lpo) => (
+            {sortedLpos.map((lpo) => {
+              // Calculate total invoiced from line items
+              const lpoInvoiced = lpos?.reduce((sum, l) => {
+                if (l.po_number === lpo.po_number) {
+                  // We need to get line items for this - for now show 0 if not calculated
+                  return sum;
+                }
+                return sum;
+              }, 0) || 0;
+              
+              return (
               <tr 
                 key={lpo._id} 
                 className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
                 onClick={() => { setSelectedLpoId(lpo._id); setSelectedLpoNumber(lpo.po_number); }}
               >
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{lpo.po_number}</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{lpo.order_date ? new Date(lpo.order_date).toLocaleDateString('en-GB') : '-'}</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{lpo.delivery_date ? new Date(lpo.delivery_date).toLocaleDateString('en-GB') : '-'}</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{lpo.customer || <span className="text-amber-500 italic">Click to add</span>}</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{lpo.supplier}</td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-3 font-medium text-gray-900 dark:text-white">{lpo.po_number}</td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{lpo.order_date ? new Date(lpo.order_date).toLocaleDateString('en-GB') : '-'}</td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{lpo.delivery_date ? new Date(lpo.delivery_date).toLocaleDateString('en-GB') : '-'}</td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{lpo.customer || <span className="text-amber-500 italic">Click to add</span>}</td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-400">{lpo.supplier}</td>
+                <td className="px-3 py-3">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(lpo.status)}`}>
                     {lpo.status || 'pending'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right text-gray-900 dark:text-white font-medium">
+                <td className="px-3 py-3 text-right text-gray-900 dark:text-white font-medium">
                   {lpo.total_incl_vat?.toLocaleString() || '0'}
                 </td>
+                <td className="px-3 py-3 text-right text-green-600 dark:text-green-400 font-medium">
+                  {(lpo as any).commission_amount ? 
+                    ((lpo.total_incl_vat || 0) + (lpo.commission_amount || 0)).toLocaleString() : 
+                    '-'}
+                </td>
+                <td className="px-3 py-3 text-right text-purple-600 dark:text-purple-400">
+                  {lpo.commission_pct ? `${lpo.commission_pct}%` : '-'}
+                </td>
+                <td className="px-3 py-3 text-right text-purple-600 dark:text-purple-400 font-medium">
+                  {lpo.commission_amount ? lpo.commission_amount.toLocaleString() : '-'}
+                </td>
               </tr>
-            ))}
+              );
+            })}
             {sortedLpos.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
                   No LPOs yet. Upload an Excel file to add LPOs.
                 </td>
               </tr>
@@ -259,7 +297,7 @@ export default function LpoPage() {
             
             {/* Editable Header Fields */}
             <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
                   <input
@@ -293,13 +331,23 @@ export default function LpoPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Supplier</label>
+                  <label className="block text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">Commission %</label>
                   <input
-                    type="text"
-                    value={selectedLpo.supplier || ''}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-500"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={editForm.commission_pct || ''}
+                    onChange={(e) => setEditForm({...editForm, commission_pct: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                    placeholder="0"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">Commission Amount</label>
+                  <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-purple-700 dark:text-purple-300 font-medium">
+                    AED {commissionAmount.toFixed(2)}
+                  </div>
                 </div>
               </div>
             </div>
