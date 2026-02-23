@@ -88,7 +88,9 @@ export default defineSchema({
     vat_pct: v.number(),
     vat_amount: v.number(),
     amount_incl_vat: v.number(),
-    amount_invoiced: v.optional(v.number()), // For tracking invoiced amount
+    amount_invoiced: v.optional(v.number()), // qty_delivered * unit_cost (excl VAT)
+    vat_amount_invoiced: v.optional(v.number()), // VAT 5% on invoiced amount
+    total_incl_vat_invoiced: v.optional(v.number()), // amount_invoiced + VAT
     invoice_number: v.optional(v.string()),
     invoice_date: v.optional(v.string()),
   }).index("by_po_number", ["po_number"]).index("by_barcode", ["barcode"]),

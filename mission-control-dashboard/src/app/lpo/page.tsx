@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLpoTable, useInsertLpoTable, useInsertLpoLineItems, useLpoLineItemsByPoNumber, useUpdateLpo, useUpdateLpoLineItem } from "../../hooks/useConvex";
 import { useSession } from "next-auth/react";
+import { Id } from "../../../convex/_generated/dataModel";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,8 @@ interface LpoLineItem {
   vat_amount: number;
   amount_incl_vat: number;
   amount_invoiced?: number;
+  vat_amount_invoiced?: number;
+  total_incl_vat_invoiced?: number;
 }
 
 export default function LpoPage() {
@@ -65,18 +68,26 @@ export default function LpoPage() {
     setEditLineItems(lineItems);
   }, [lineItems]);
   
-  // Update line item delivery
+  // Update line item delivery and auto-calculate amounts
   const updateEditLineItem = (index: number, field: string, value: any) => {
     const updated = [...editLineItems];
     (updated[index] as any)[field] = value;
     
-    // Auto-calculate amount_invoiced = qty_delivered * unit_cost * 1.05
+    // Auto-calculate amounts when qty_delivered changes
     if (field === 'quantity_delivered') {
       const qty = parseFloat(value) || 0;
       const unitCost = updated[index].unit_cost;
+      
+      // amount_invoiced = qty_delivered * unit_cost (excl VAT)
       const amountExcl = qty * unitCost;
-      const amountIncl = amountExcl * 1.05;
-      updated[index].amount_invoiced = amountIncl;
+      // vat_amount_invoiced = amount_excl * 5%
+      const vatAmt = amountExcl * 0.05;
+      // total_incl_vat_invoiced = amount_excl + VAT
+      const amountIncl = amountExcl + vatAmt;
+      
+      updated[index].amount_invoiced = amountExcl;
+      updated[index].vat_amount_invoiced = vatAmt;
+      updated[index].total_incl_vat_invoiced = amountIncl;
     }
     
     setEditLineItems(updated);
@@ -106,11 +117,13 @@ export default function LpoPage() {
       // Update each line item
       for (const item of editLineItems) {
         if (item.quantity_delivered && item.quantity_delivered > 0) {
-          console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced);
+          console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced, item.vat_amount_invoiced, item.total_incl_vat_invoiced);
           await updateLpoLineItem({
             lineItemId: item._id,
             quantity_delivered: item.quantity_delivered,
             amount_invoiced: item.amount_invoiced,
+            vat_amount_invoiced: item.vat_amount_invoiced,
+            total_incl_vat_invoiced: item.total_incl_vat_invoiced,
           });
         }
       }
@@ -133,19 +146,21 @@ export default function LpoPage() {
     }
   };
   
-  // Calculate totals - show stored values not reactive while typing
+  // Calculate totals
   const totals = useMemo(() => {
     let orderedTotal = 0;
     let invoicedTotal = 0;
-    let totalQty = 0;
+    let vatTotal = 0;
+    let grandTotal = 0;
     
     for (const item of editLineItems) {
       orderedTotal += item.amount_incl_vat || 0;
       invoicedTotal += item.amount_invoiced || 0;
-      totalQty += item.quantity_delivered || 0;
+      vatTotal += item.vat_amount_invoiced || 0;
+      grandTotal += item.total_incl_vat_invoiced || 0;
     }
     
-    return { orderedTotal, invoicedTotal, totalQty };
+    return { orderedTotal, invoicedTotal, vatTotal, grandTotal };
   }, [editLineItems]);
   
   // Get status color
@@ -225,7 +240,7 @@ export default function LpoPage() {
       {/* Edit Modal */}
       {selectedLpoId && selectedLpo && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex justify-between items-start">
@@ -300,7 +315,9 @@ export default function LpoPage() {
                     <th className="px-3 py-2 text-right font-medium text-gray-500 w-24">Unit Cost</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-500 w-28">Ordered Amt</th>
                     <th className="px-3 py-2 text-right font-medium text-blue-600 w-24">Qty Delivered</th>
-                    <th className="px-3 py-2 text-right font-medium text-blue-600 w-28">Amount Invoiced</th>
+                    <th className="px-3 py-2 text-right font-medium text-blue-600 w-28">Invoiced Amt</th>
+                    <th className="px-3 py-2 text-right font-medium text-blue-600 w-24">VAT 5%</th>
+                    <th className="px-3 py-2 text-right font-medium text-blue-600 w-28">Total + VAT</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -330,11 +347,21 @@ export default function LpoPage() {
                           AED {(item.amount_invoiced || 0).toFixed(2)}
                         </span>
                       </td>
+                      <td className="px-3 py-2 text-right">
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">
+                          AED {(item.vat_amount_invoiced || 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span className="text-blue-700 dark:text-blue-300 font-bold">
+                          AED {(item.total_incl_vat_invoiced || 0).toFixed(2)}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                   {editLineItems.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-gray-500">
+                      <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
                         Loading line items...
                       </td>
                     </tr>
@@ -352,12 +379,16 @@ export default function LpoPage() {
                   <p className="text-lg font-bold">AED {totals.orderedTotal.toFixed(2)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Total Qty Delivered</p>
-                  <p className="text-lg font-bold">{totals.totalQty}</p>
+                  <p className="text-xs text-blue-600">Invoiced Amt</p>
+                  <p className="text-lg font-bold text-blue-600">AED {totals.invoicedTotal.toFixed(2)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-blue-600">Total Invoiced</p>
-                  <p className="text-lg font-bold text-blue-600">AED {totals.invoicedTotal.toFixed(2)}</p>
+                  <p className="text-xs text-blue-600">VAT 5%</p>
+                  <p className="text-lg font-bold text-blue-600">AED {totals.vatTotal.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-700">Total + VAT</p>
+                  <p className="text-xl font-bold text-blue-700">AED {totals.grandTotal.toFixed(2)}</p>
                 </div>
               </div>
               
@@ -376,7 +407,7 @@ export default function LpoPage() {
               {/* Buttons */}
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-500">
-                  Tip: Enter qty delivered → Amount Invoiced auto-calculates
+                  Tip: Enter qty delivered → All amounts auto-calculate
                 </div>
                 <div className="flex gap-3">
                   <button

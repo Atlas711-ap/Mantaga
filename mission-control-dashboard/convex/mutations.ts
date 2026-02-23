@@ -728,11 +728,15 @@ export const updateLpoLineItem = mutation({
     lineItemId: v.any(), // Accept string or Id
     quantity_delivered: v.optional(v.number()),
     amount_invoiced: v.optional(v.number()),
+    vat_amount_invoiced: v.optional(v.number()),
+    total_incl_vat_invoiced: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const updateData: any = {};
     if (args.quantity_delivered !== undefined) updateData.quantity_delivered = args.quantity_delivered;
     if (args.amount_invoiced !== undefined) updateData.amount_invoiced = args.amount_invoiced;
+    if (args.vat_amount_invoiced !== undefined) updateData.vat_amount_invoiced = args.vat_amount_invoiced;
+    if (args.total_incl_vat_invoiced !== undefined) updateData.total_incl_vat_invoiced = args.total_incl_vat_invoiced;
     
     // Handle both string and Id types
     const lineItemId = typeof args.lineItemId === 'string' ? args.lineItemId as any : args.lineItemId;
