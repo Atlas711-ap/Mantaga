@@ -1,7 +1,7 @@
 // MiniMax AI Client
 // Handles API calls to MiniMax for AI agent responses
 
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
+const MINIMAX_API_KEY = process.env.NEXT_PUBLIC_MINIMAX_API_KEY || process.env.MINIMAX_API_KEY;
 const MINIMAX_BASE_URL = "https://api.minimax.chat/v1";
 
 // Model configurations

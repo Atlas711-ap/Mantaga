@@ -83,14 +83,18 @@ export async function routeToAgent(
     // Get the right model for this agent
     const model = AGENT_MODELS[agentId as keyof typeof AGENT_MODELS] || "MiniMax_M2.5";
     
+    console.log(`Calling MiniMax for ${agentId} with model ${model}...`);
+    
     // Call MiniMax API
     const response = await callMiniMax(messages, model);
+    console.log(`Got response from ${agentId}`);
     return response;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Agent response error:", error);
     
-    // Fallback to mock if API fails
-    return generateMockResponse(agentId, message);
+    // Return mock if API fails, with error note
+    const mockResponse = generateMockResponse(agentId, message);
+    return `${mockResponse}\n\n⚠️ Note: AI response unavailable (using fallback). Error: ${error.message}`;
   }
 }
 
