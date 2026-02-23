@@ -81,7 +81,7 @@ export async function routeToAgent(
     const messages = buildAgentContext(agentId, message, knowledgeBase, teamContext);
     
     // Get the right model for this agent
-    const model = AGENT_MODELS[agentId] || "MiniMax_M2.5";
+    const model = AGENT_MODELS[agentId as keyof typeof AGENT_MODELS] || "MiniMax_M2.5";
     
     // Call MiniMax API
     const response = await callMiniMax(messages, model);
