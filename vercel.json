@@ -1,5 +1,0 @@
-{
-  "buildCommand": "cd mission-control-dashboard && npm run build",
-  "outputDirectory": "mission-control-dashboard/.next",
-  "installCommand": "cd mission-control-dashboard && npm install"
-}
