@@ -182,6 +182,21 @@ export default defineSchema({
     updated_at: v.string(),
   }).index("by_key", ["key"]),
 
+  // Task management
+  tasks: defineTable({
+    title: v.string(),
+    description: v.string(),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("cancelled")),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("urgent")),
+    assigned_to: v.optional(v.string()), // agent name: nexus, atlas, forge, neo, zeus, faith, alexis
+    created_by: v.string(),
+    created_at: v.string(),
+    updated_at: v.string(),
+    completed_at: v.optional(v.string()),
+    due_date: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  }).index("by_status", ["status"]).index("by_assigned", ["assigned_to"]).index("by_priority", ["priority"]),
+
   // User management for auth
   users: defineTable({
     email: v.string(),

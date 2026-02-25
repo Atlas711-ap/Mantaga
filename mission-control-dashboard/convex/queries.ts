@@ -422,3 +422,40 @@ export const getLpoById = query({
     return await ctx.db.get(args.lpoId as any);
   },
 });
+
+// ============ TASK QUERIES ============
+
+export const getAllTasks = query({
+  handler: async (ctx) => {
+    return await ctx.db.query("tasks").order("desc").collect();
+  },
+});
+
+export const getTasksByStatus = query({
+  args: { status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("cancelled")) },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("tasks")
+      .withIndex("by_status", (q) => q.eq("status", args.status))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getTasksByAgent = query({
+  args: { agent: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("tasks")
+      .withIndex("by_assigned", (q) => q.eq("assigned_to", args.agent))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getPendingTasks = query({
+  handler: async (ctx) => {
+    return await ctx.db.query("tasks")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .order("desc")
+      .collect();
+  },
+});

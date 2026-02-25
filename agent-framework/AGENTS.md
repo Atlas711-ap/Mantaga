@@ -1,61 +1,41 @@
-# AGENTS.md - Mantaga AI Team
+# Mantaga AI Team Structure
 
-## 7-Agent Structure
+## Communication Flow
+**User → Athena → Team → (ask Neo for tools) → Athena → User**
 
-| Level | Agent | Role | Reports To | Status |
-|-------|-------|------|------------|--------|
-| 1 | Athena | CEO Agent | Anush | ACTIVE |
-| 2 | Nexus | Trade Marketing Manager | Athena | ACTIVE |
-| 2 | Atlas | Ecommerce KAM | Athena | ACTIVE |
-| 2 | Forge | Supply Chain Manager | Athena | ACTIVE |
-| 2 | Neo | IT Manager | Athena | IDLE |
-| 2 | Zeus | Marketing Manager | Athena | IDLE |
-| 3 | Faith | Ecommerce Coordinator | Atlas | IDLE |
-| 3 | Alexis | Performance Marketing | Atlas | IDLE |
+## Model Distribution
+- **MiniMax-M2.5:** Athena (orchestration), Neo (tool building), Zeus (marketing)
+- **qwen2.5-vl:32b:** Atlas (document parsing), Scout (data fetching)
+- **qwen2.5-coder:32b:** Nexus, Atlas, Forge, Faith, Alexis
 
-## Agent Details
+## Agent Roles
 
-### Athena - CEO Agent
-- **Role:** Executive Decision Maker
-- **Mission:** Coordinate AI agents, daily summaries to Anush
-- **Model:** MiniMax M2.5
+| Agent | Role | Model | Scope |
+|-------|------|-------|-------|
+| **Athena** | CEO Coordinator | MiniMax-M2.5 | Orchestrates team |
+| **Neo** | IT & Tools | MiniMax-M2.5 | Builds skills & tools |
+| **Atlas** | Document Parser | qwen2.5-vl:32b | LPO & Invoice parsing |
+| **Scout** | Data Fetcher | qwen2.5-vl:32b | API data from platforms |
+| **Nexus** | Sales Manager | qwen2.5-coder:32b | Sales analysis |
+| **Atlas** | Stock & Customers | qwen2.5-coder:32b | SKU & customer data |
+| **Forge** | Supply Chain | qwen2.5-coder:32b | Demand forecasting |
+| **Zeus** | Marketing | MiniMax-M2.5 | Brand & campaigns |
+| **Faith** | SKU Coordinator | qwen2.5-coder:32b | SKU validation |
+| **Alexis** | PPC Ads | qwen2.5-coder:32b | Ad optimization |
 
-### Nexus - Trade Marketing Manager
-- **Role:** Sales & Budget Manager
-- **Mission:** Targets vs actual, marketing budgets (≤20%)
-- **Model:** Qwen 32B
+## Key Rules
+1. When any agent needs a skill/tool → Ask Neo to build it
+2. When data needs parsing from PDFs/images → Use qwen2.5-vl:32b
+3. When data needs text analysis → Use qwen2.5-coder:32b
+4. When reasoning/strategy needed → Use MiniMax-M2.5
 
-### Atlas - Ecommerce KAM
-- **Role:** Customer & Stock Manager
-- **Mission:** Customer insights, ads performance, stock movement
-- **Model:** Qwen 32B
-- **Manages:** Faith, Alexis
-
-### Forge - Supply Chain Manager
-- **Role:** Forecasting
-- **Mission:** SKU volume forecasting → Nexus for targets
-- **Model:** Qwen 32B
-
-### Neo - IT Manager
-- **Role:** Tool Builder
-- **Mission:** Build tools and skills for team
-- **Model:** Qwen 32B
-
-### Zeus - Marketing Manager
-- **Role:** Brand & Acquisition
-- **Mission:** Digital marketing, brand marketing, client acquisition
-- **Model:** Qwen 32B
-
-### Faith - Ecommerce Coordinator
-- **Role:** SKU Data Manager
-- **Mission:** Master SKU List, stock reports → Atlas
-- **Model:** Qwen 32B
-
-### Alexis - Performance Marketing
-- **Role:** PPC Manager
-- **Mission:** Talabat PPC → insights for Atlas
-- **Model:** Qwen 32B
+## Vercel Deployment Rules (IMPORTANT)
+- Project name: **mantaga**
+- Path: **~/Mantaga/mission-control-dashboard/**
+- NEVER create new Vercel projects
+- Check .vercel/project.json before deploying
+- Command: `cd ~/Mantaga/mission-control-dashboard && git push origin main`
 
 ---
 
-*Last Updated: 2026-02-23*
+*Last Updated: 2026-02-25*

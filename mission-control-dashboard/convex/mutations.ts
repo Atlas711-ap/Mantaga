@@ -868,3 +868,68 @@ export const syncBrandPerformance = mutation({
     return { success: true, count: lineItems.length };
   },
 });
+
+// ============ TASKS ============
+
+export const createTask = mutation({
+  args: {
+    title: v.string(),
+    description: v.string(),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("urgent")),
+    assigned_to: v.optional(v.string()),
+    created_by: v.string(),
+    due_date: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const now = new Date().toISOString();
+    return await ctx.db.insert("tasks", {
+      title: args.title,
+      description: args.description,
+      status: "pending",
+      priority: args.priority,
+      assigned_to: args.assigned_to,
+      created_by: args.created_by,
+      created_at: now,
+      updated_at: now,
+      due_date: args.due_date,
+      tags: args.tags,
+    });
+  },
+});
+
+export const updateTaskStatus = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("cancelled")),
+    assigned_to: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = new Date().toISOString();
+    const updateData: any = {
+      status: args.status,
+      updated_at: now,
+    };
+    if (args.assigned_to) {
+      updateData.assigned_to = args.assigned_to;
+    }
+    if (args.status === "completed") {
+      updateData.completed_at = now;
+    }
+    await ctx.db.patch(args.taskId, updateData);
+  },
+});
+
+export const assignTask = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    assigned_to: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.taskId, {
+      assigned_to: args.assigned_to,
+      status: "in_progress",
+      updated_at: new Date().toISOString(),
+    });
+  },
+});
