@@ -1,11 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 
-const API_KEY = process.env.TASK_API_KEY || "mantaga-secret-key";
+// In-memory task store for demo (resets on server restart)
+// For production, integrate with Convex or database
+const tasks: Map<string, any> = new Map();
 
-// In-memory task store (shared across requests in development)
-// In production, this would connect to Convex or a database
-const tasks = new Map();
+// Pre-populate with demo tasks
+const demoTasks = [
+  {
+    id: uuidv4(),
+    title: 'Follow up with Quadrant',
+    description: 'Check on pending orders and delivery status',
+    status: 'in_progress',
+    priority: 'high',
+    assigned_to: 'nexus',
+    created_by: 'Anush',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: uuidv4(),
+    title: 'Review Amazon sales report',
+    description: 'Analyze last week performance',
+    status: 'pending',
+    priority: 'medium',
+    assigned_to: 'atlas',
+    created_by: 'Athena',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+// Initialize demo tasks
+demoTasks.forEach(t => tasks.set(t.id, t));
 
 export async function POST(request: NextRequest) {
   try {

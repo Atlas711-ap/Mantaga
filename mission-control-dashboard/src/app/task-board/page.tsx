@@ -14,28 +14,21 @@ interface Task {
   assigned_to?: string;
   created_by: string;
   created_at: string;
-  due_date?: string;
 }
 
 const AGENTS = ['nexus', 'atlas', 'forge', 'neo', 'zeus', 'faith', 'alexis', 'scout'];
 
+// Demo tasks for testing
+const DEMO_TASKS: Task[] = [
+  { id: '1', title: 'Test Task 1', description: 'This is a test task', status: 'pending', priority: 'medium', created_by: 'Athena', created_at: new Date().toISOString() },
+  { id: '2', title: 'Follow up with Quadrant', description: 'Check on pending orders', status: 'in_progress', priority: 'high', assigned_to: 'nexus', created_by: 'Anush', created_at: new Date().toISOString() },
+];
+
 export default function TaskBoardPage() {
   const [filter, setFilter] = useState<'all' | TaskStatus>('all');
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(DEMO_TASKS);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [loading, setLoading] = useState(true);
   
-  // Fetch tasks from API
-  useEffect(() => {
-    fetch('/api/tasks')
-      .then(res => res.json())
-      .then(data => {
-        setTasks(data.tasks || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
   const filteredTasks = filter === 'all' 
     ? tasks 
     : tasks.filter((t) => t.status === filter);
@@ -62,10 +55,21 @@ export default function TaskBoardPage() {
     }
   };
 
-  const refreshTasks = () => {
-    fetch('/api/tasks')
-      .then(res => res.json())
-      .then(data => setTasks(data.tasks || []));
+  const handleStatusChange = (taskId: string, status: TaskStatus) => {
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, status } : t));
+  };
+
+  const handleAssign = (taskId: string, agent: string) => {
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, assigned_to: agent } : t));
+  };
+
+  const handleCreateTask = (task: Omit<Task, 'id' | 'created_at'>) => {
+    const newTask: Task = {
+      ...task,
+      id: Date.now().toString(),
+      created_at: new Date().toISOString(),
+    };
+    setTasks([newTask, ...tasks]);
   };
 
   return (
@@ -121,15 +125,13 @@ export default function TaskBoardPage() {
       </div>
 
       {/* Task List */}
-      {loading ? (
-        <div className="text-center py-12 text-slate-500">Loading...</div>
-      ) : filteredTasks.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">
-          No tasks found
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredTasks.map((task) => (
+      <div className="space-y-3">
+        {filteredTasks.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            No tasks found
+          </div>
+        ) : (
+          filteredTasks.map((task) => (
             <div key={task.id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
@@ -149,7 +151,6 @@ export default function TaskBoardPage() {
                   <div className="flex gap-4 mt-2 text-xs text-slate-500">
                     <span>By: {task.created_by}</span>
                     <span>{new Date(task.created_at).toLocaleDateString()}</span>
-                    {task.due_date && <span>Due: {task.due_date}</span>}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -165,62 +166,52 @@ export default function TaskBoardPage() {
                       ))}
                     </select>
                   )}
+                  {task.status !== 'completed' && (
+                    <select
+                      onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                      className="bg-slate-700 text-sm rounded px-2 py-1"
+                      value={task.status}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* Create Modal */}
       {showCreateModal && (
-        <CreateTaskModal onClose={() => setShowCreateModal(false)} onCreate={refreshTasks} />
+        <CreateTaskModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateTask} />
       )}
     </div>
   );
 }
 
-async function handleAssign(taskId: string, agent: string) {
-  // For now, just refresh - full update implementation later
-  const res = await fetch('/api/tasks');
-  const data = await res.json();
-}
-
-function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate: () => void }) {
+function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate: (task: Omit<Task, 'id' | 'created_at'>) => void }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     priority: 'medium' as TaskPriority,
     assigned_to: '',
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          priority: formData.priority,
-          assigned_to: formData.assigned_to || undefined,
-          created_by: 'Athena',
-        }),
-      });
-      
-      if (res.ok) {
-        onCreate();
-        onClose();
-      }
-    } catch (error) {
-      console.error('Failed to create task:', error);
-    }
-    
-    setSubmitting(false);
+    onCreate({
+      title: formData.title,
+      description: formData.description,
+      priority: formData.priority,
+      status: 'pending',
+      assigned_to: formData.assigned_to || undefined,
+      created_by: 'Athena',
+    });
+    onClose();
   };
 
   return (
@@ -286,10 +277,9 @@ function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 rounded disabled:opacity-50"
+              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 rounded"
             >
-              {submitting ? 'Creating...' : 'Create Task'}
+              Create Task
             </button>
           </div>
         </form>
