@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useAllTasks, useCreateTask, useUpdateTaskStatus, useAssignTask } from '../../hooks/useConvex';
+import { Id } from '../../../convex/_generated/dataModel';
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 interface Task {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   status: TaskStatus;
@@ -14,28 +16,29 @@ interface Task {
   assigned_to?: string;
   created_by: string;
   created_at: string;
+  updated_at: string;
+  due_date?: string;
 }
 
 const AGENTS = ['nexus', 'atlas', 'forge', 'neo', 'zeus', 'faith', 'alexis', 'scout'];
 
-// Demo tasks for testing
-const DEMO_TASKS: Task[] = [
-  { id: '1', title: 'Test Task 1', description: 'This is a test task', status: 'pending', priority: 'medium', created_by: 'Athena', created_at: new Date().toISOString() },
-  { id: '2', title: 'Follow up with Quadrant', description: 'Check on pending orders', status: 'in_progress', priority: 'high', assigned_to: 'nexus', created_by: 'Anush', created_at: new Date().toISOString() },
-];
-
 export default function TaskBoardPage() {
   const [filter, setFilter] = useState<'all' | TaskStatus>('all');
-  const [tasks, setTasks] = useState<Task[]>(DEMO_TASKS);
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  const filteredTasks = filter === 'all' 
-    ? tasks 
-    : tasks.filter((t) => t.status === filter);
+  // Real Convex data
+  const allTasks = useAllTasks() || [];
+  const createTask = useCreateTask();
+  const updateTaskStatus = useUpdateTaskStatus();
+  const assignTask = useAssignTask();
 
-  const pendingTasks = tasks.filter((t) => t.status === 'pending');
-  const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const completedTasks = tasks.filter((t) => t.status === 'completed');
+  const filteredTasks = filter === 'all' 
+    ? allTasks 
+    : allTasks.filter((t: Task) => t.status === filter);
+
+  const pendingTasks = allTasks.filter((t: Task) => t.status === 'pending');
+  const inProgressTasks = allTasks.filter((t: Task) => t.status === 'in_progress');
+  const completedTasks = allTasks.filter((t: Task) => t.status === 'completed');
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
@@ -55,21 +58,12 @@ export default function TaskBoardPage() {
     }
   };
 
-  const handleStatusChange = (taskId: string, status: TaskStatus) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, status } : t));
+  const handleStatusChange = async (taskId: string, status: TaskStatus) => {
+    await updateTaskStatus({ taskId: taskId as Id<"tasks">, status });
   };
 
-  const handleAssign = (taskId: string, agent: string) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, assigned_to: agent } : t));
-  };
-
-  const handleCreateTask = (task: Omit<Task, 'id' | 'created_at'>) => {
-    const newTask: Task = {
-      ...task,
-      id: Date.now().toString(),
-      created_at: new Date().toISOString(),
-    };
-    setTasks([newTask, ...tasks]);
+  const handleAssign = async (taskId: string, agent: string) => {
+    await assignTask({ taskId: taskId as Id<"tasks">, assigned_to: agent });
   };
 
   return (
@@ -102,7 +96,7 @@ export default function TaskBoardPage() {
           <div className="text-sm text-slate-400">Completed</div>
         </div>
         <div className="bg-slate-800 rounded-lg p-4">
-          <div className="text-2xl font-bold">{tasks.length}</div>
+          <div className="text-2xl font-bold">{allTasks.length}</div>
           <div className="text-sm text-slate-400">Total</div>
         </div>
       </div>
@@ -126,13 +120,17 @@ export default function TaskBoardPage() {
 
       {/* Task List */}
       <div className="space-y-3">
-        {filteredTasks.length === 0 ? (
+        {!allTasks || allTasks.length === 0 ? (
           <div className="text-center py-12 text-slate-500">
-            No tasks found
+            No tasks found. Create one to get started.
+          </div>
+        ) : filteredTasks.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            No tasks with status "{filter}"
           </div>
         ) : (
-          filteredTasks.map((task) => (
-            <div key={task.id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+          filteredTasks.map((task: Task) => (
+            <div key={task._id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -151,12 +149,13 @@ export default function TaskBoardPage() {
                   <div className="flex gap-4 mt-2 text-xs text-slate-500">
                     <span>By: {task.created_by}</span>
                     <span>{new Date(task.created_at).toLocaleDateString()}</span>
+                    {task.due_date && <span>Due: {task.due_date}</span>}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   {!task.assigned_to && task.status === 'pending' && (
                     <select
-                      onChange={(e) => handleAssign(task.id, e.target.value)}
+                      onChange={(e) => handleAssign(task._id, e.target.value)}
                       className="bg-slate-700 text-sm rounded px-2 py-1"
                       defaultValue=""
                     >
@@ -168,7 +167,7 @@ export default function TaskBoardPage() {
                   )}
                   {task.status !== 'completed' && (
                     <select
-                      onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                      onChange={(e) => handleStatusChange(task._id, e.target.value as TaskStatus)}
                       className="bg-slate-700 text-sm rounded px-2 py-1"
                       value={task.status}
                     >
@@ -187,31 +186,42 @@ export default function TaskBoardPage() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <CreateTaskModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateTask} />
+        <CreateTaskModal onClose={() => setShowCreateModal(false)} />
       )}
     </div>
   );
 }
 
-function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate: (task: Omit<Task, 'id' | 'created_at'>) => void }) {
+function CreateTaskModal({ onClose }: { onClose: () => void }) {
+  const createTask = useCreateTask();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     priority: 'medium' as TaskPriority,
     assigned_to: '',
+    due_date: '',
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onCreate({
-      title: formData.title,
-      description: formData.description,
-      priority: formData.priority,
-      status: 'pending',
-      assigned_to: formData.assigned_to || undefined,
-      created_by: 'Athena',
-    });
-    onClose();
+    setSubmitting(true);
+    
+    try {
+      await createTask({
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        assigned_to: formData.assigned_to || undefined,
+        created_by: 'Athena',
+        due_date: formData.due_date || undefined,
+      });
+      onClose();
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
+    
+    setSubmitting(false);
   };
 
   return (
@@ -267,6 +277,15 @@ function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate:
               </select>
             </div>
           </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Due date</label>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"
+            />
+          </div>
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -277,9 +296,10 @@ function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 rounded"
+              disabled={submitting}
+              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 rounded disabled:opacity-50"
             >
-              Create Task
+              {submitting ? 'Creating...' : 'Create Task'}
             </button>
           </div>
         </form>
