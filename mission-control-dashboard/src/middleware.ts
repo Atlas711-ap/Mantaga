@@ -14,6 +14,7 @@ export async function middleware(request: any) {
   const isSeedRoute = request.nextUrl.pathname === "/api/users/seed"
   const isAtlasRoute = request.nextUrl.pathname.startsWith("/api/atlas-parse")
   const isTaskRoute = request.nextUrl.pathname.startsWith("/api/tasks")
+  const isLpoRoute = request.nextUrl.pathname.startsWith("/api/lpos")
 
   // Allow seed route (public - for creating first user)
   if (isSeedRoute) {
@@ -27,6 +28,11 @@ export async function middleware(request: any) {
 
   // Allow Task API routes (public - for Athena integration)
   if (isTaskRoute) {
+    return NextResponse.next()
+  }
+
+  // Allow LPO API routes (public - for reporting)
+  if (isLpoRoute) {
     return NextResponse.next()
   }
 
