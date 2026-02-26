@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useAllTasks, useCreateTask, useUpdateTaskStatus, useAssignTask } from '../../hooks/useConvex';
-import { Id } from '../../../convex/_generated/dataModel';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -25,20 +26,48 @@ const AGENTS = ['nexus', 'atlas', 'forge', 'neo', 'zeus', 'faith', 'alexis', 'sc
 export default function TaskBoardPage() {
   const [filter, setFilter] = useState<'all' | TaskStatus>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   
-  // Real Convex data
-  const allTasks = useAllTasks() || [];
-  const createTask = useCreateTask();
-  const updateTaskStatus = useUpdateTaskStatus();
-  const assignTask = useAssignTask();
+  // Only run on client to avoid hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
+  // Use Convex hooks - wrapped to handle loading/error states
+  const tasks = useQuery(api.queries.getAllTasks);
+  const createTaskMutation = useMutation(api.mutations.createTask);
+  const updateTaskStatusMutation = useMutation(api.mutations.updateTaskStatus);
+  const assignTaskMutation = useMutation(api.mutations.assignTask);
+
+  // Handle loading state
+  if (!isClient) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">📋 Task Board</h1>
+        <p className="text-slate-400">Loading...</p>
+      </div>
+    );
+  }
+
+  // Handle error/loading state from Convex
+  if (tasks === undefined) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">📋 Task Board</h1>
+        <p className="text-slate-400">Connecting to database...</p>
+      </div>
+    );
+  }
+
+  const allTasks: Task[] = tasks || [];
+  
   const filteredTasks = filter === 'all' 
     ? allTasks 
-    : allTasks.filter((t: Task) => t.status === filter);
+    : allTasks.filter((t) => t.status === filter);
 
-  const pendingTasks = allTasks.filter((t: Task) => t.status === 'pending');
-  const inProgressTasks = allTasks.filter((t: Task) => t.status === 'in_progress');
-  const completedTasks = allTasks.filter((t: Task) => t.status === 'completed');
+  const pendingTasks = allTasks.filter((t) => t.status === 'pending');
+  const inProgressTasks = allTasks.filter((t) => t.status === 'in_progress');
+  const completedTasks = allTasks.filter((t) => t.status === 'completed');
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
@@ -59,11 +88,19 @@ export default function TaskBoardPage() {
   };
 
   const handleStatusChange = async (taskId: string, status: TaskStatus) => {
-    await updateTaskStatus({ taskId: taskId as Id<"tasks">, status });
+    try {
+      await updateTaskStatusMutation({ taskId: taskId as Id<"tasks">, status });
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+    }
   };
 
   const handleAssign = async (taskId: string, agent: string) => {
-    await assignTask({ taskId: taskId as Id<"tasks">, assigned_to: agent });
+    try {
+      await assignTaskMutation({ taskId: taskId as Id<"tasks">, assigned_to: agent });
+    } catch (error) {
+      console.error('Failed to assign task:', error);
+    }
   };
 
   return (
@@ -120,7 +157,7 @@ export default function TaskBoardPage() {
 
       {/* Task List */}
       <div className="space-y-3">
-        {!allTasks || allTasks.length === 0 ? (
+        {allTasks.length === 0 ? (
           <div className="text-center py-12 text-slate-500">
             No tasks found. Create one to get started.
           </div>
@@ -129,7 +166,7 @@ export default function TaskBoardPage() {
             No tasks with status "{filter}"
           </div>
         ) : (
-          filteredTasks.map((task: Task) => (
+          filteredTasks.map((task) => (
             <div key={task._id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
@@ -186,14 +223,13 @@ export default function TaskBoardPage() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <CreateTaskModal onClose={() => setShowCreateModal(false)} />
+        <CreateTaskModal onClose={() => setShowCreateModal(false)} createTask={createTaskMutation} />
       )}
     </div>
   );
 }
 
-function CreateTaskModal({ onClose }: { onClose: () => void }) {
-  const createTask = useCreateTask();
+function CreateTaskModal({ onClose, createTask }: { onClose: () => void; createTask: any }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
