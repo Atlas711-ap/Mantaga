@@ -222,3 +222,20 @@ export const useUpdateLpo = () => {
 export const useUpdateLpoLineItem = () => {
   return useMutation(api.mutations.updateLpoLineItem);
 };
+
+// Tasks - using any types to bypass codegen issues
+export function useAllTasks() {
+  return useQuery(api.queries.getAllTasks as any);
+}
+
+export function useCreateTask() {
+  return useMutation(api.mutations.createTask as any);
+}
+
+export function useUpdateTaskStatus() {
+  return useMutation(api.mutations.updateTaskStatus as any);
+}
+
+export function useAssignTask() {
+  return useMutation(api.mutations.assignTask as any);
+}
