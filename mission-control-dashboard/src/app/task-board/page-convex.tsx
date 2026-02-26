@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { Id } from '@/../convex/_generated/dataModel';
+import { api } from '@/../convex/_generated/api';
 
+// Task types
 type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 interface Task {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   status: TaskStatus;
@@ -14,35 +18,30 @@ interface Task {
   assigned_to?: string;
   created_by: string;
   created_at: string;
+  updated_at: string;
+  completed_at?: string;
   due_date?: string;
+  tags?: string[];
 }
 
 const AGENTS = ['nexus', 'atlas', 'forge', 'neo', 'zeus', 'faith', 'alexis', 'scout'];
 
 export default function TaskBoardPage() {
   const [filter, setFilter] = useState<'all' | TaskStatus>('all');
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [loading, setLoading] = useState(true);
   
-  // Fetch tasks from API
-  useEffect(() => {
-    fetch('/api/tasks')
-      .then(res => res.json())
-      .then(data => {
-        setTasks(data.tasks || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  const tasks = useQuery(api.queries.getAllTasks) || [];
+  
+  const updateTaskStatus = useMutation(api.mutations.updateTaskStatus);
+  const assignTask = useMutation(api.mutations.assignTask);
 
   const filteredTasks = filter === 'all' 
     ? tasks 
-    : tasks.filter((t) => t.status === filter);
+    : tasks.filter((t: Task) => t.status === filter);
 
-  const pendingTasks = tasks.filter((t) => t.status === 'pending');
-  const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const completedTasks = tasks.filter((t) => t.status === 'completed');
+  const pendingTasks = tasks.filter((t: Task) => t.status === 'pending');
+  const inProgressTasks = tasks.filter((t: Task) => t.status === 'in_progress');
+  const completedTasks = tasks.filter((t: Task) => t.status === 'completed');
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
@@ -62,10 +61,12 @@ export default function TaskBoardPage() {
     }
   };
 
-  const refreshTasks = () => {
-    fetch('/api/tasks')
-      .then(res => res.json())
-      .then(data => setTasks(data.tasks || []));
+  const handleStatusChange = async (taskId: Id<"tasks">, status: TaskStatus) => {
+    await updateTaskStatus({ taskId, status });
+  };
+
+  const handleAssign = async (taskId: Id<"tasks">, agent: string) => {
+    await assignTask({ taskId, assigned_to: agent });
   };
 
   return (
@@ -121,16 +122,14 @@ export default function TaskBoardPage() {
       </div>
 
       {/* Task List */}
-      {loading ? (
-        <div className="text-center py-12 text-slate-500">Loading...</div>
-      ) : filteredTasks.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">
-          No tasks found
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredTasks.map((task) => (
-            <div key={task.id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+      <div className="space-y-3">
+        {filteredTasks.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            No tasks found
+          </div>
+        ) : (
+          filteredTasks.map((task: Task) => (
+            <div key={task._id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -155,7 +154,7 @@ export default function TaskBoardPage() {
                 <div className="flex flex-col gap-2">
                   {!task.assigned_to && task.status === 'pending' && (
                     <select
-                      onChange={(e) => handleAssign(task.id, e.target.value)}
+                      onChange={(e) => handleAssign(task._id as Id<"tasks">, e.target.value)}
                       className="bg-slate-700 text-sm rounded px-2 py-1"
                       defaultValue=""
                     >
@@ -165,62 +164,56 @@ export default function TaskBoardPage() {
                       ))}
                     </select>
                   )}
+                  {task.status !== 'completed' && (
+                    <select
+                      onChange={(e) => handleStatusChange(task._id as Id<"tasks">, e.target.value as TaskStatus)}
+                      className="bg-slate-700 text-sm rounded px-2 py-1"
+                      value={task.status}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* Create Modal */}
       {showCreateModal && (
-        <CreateTaskModal onClose={() => setShowCreateModal(false)} onCreate={refreshTasks} />
+        <CreateTaskModal onClose={() => setShowCreateModal(false)} />
       )}
     </div>
   );
 }
 
-async function handleAssign(taskId: string, agent: string) {
-  // For now, just refresh - full update implementation later
-  const res = await fetch('/api/tasks');
-  const data = await res.json();
-}
-
-function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate: () => void }) {
+function CreateTaskModal({ onClose }: { onClose: () => void }) {
+  const createTask = useMutation(api.mutations.createTask);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     priority: 'medium' as TaskPriority,
     assigned_to: '',
+    due_date: '',
+    tags: '',
   });
-  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          priority: formData.priority,
-          assigned_to: formData.assigned_to || undefined,
-          created_by: 'Athena',
-        }),
-      });
-      
-      if (res.ok) {
-        onCreate();
-        onClose();
-      }
-    } catch (error) {
-      console.error('Failed to create task:', error);
-    }
-    
-    setSubmitting(false);
+    await createTask({
+      title: formData.title,
+      description: formData.description,
+      priority: formData.priority,
+      assigned_to: formData.assigned_to || undefined,
+      created_by: 'Athena',
+      due_date: formData.due_date || undefined,
+      tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : undefined,
+    });
+    onClose();
   };
 
   return (
@@ -276,6 +269,15 @@ function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate:
               </select>
             </div>
           </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Due date</label>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"
+            />
+          </div>
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -286,10 +288,9 @@ function CreateTaskModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 rounded disabled:opacity-50"
+              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 rounded"
             >
-              {submitting ? 'Creating...' : 'Create Task'}
+              Create Task
             </button>
           </div>
         </form>
