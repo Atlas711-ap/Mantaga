@@ -222,24 +222,3 @@ export const useUpdateLpo = () => {
 export const useUpdateLpoLineItem = () => {
   return useMutation(api.mutations.updateLpoLineItem);
 };
-
-// Tasks
-export function useAllTasks() {
-  return useQuery(api.queries.getAllTasks);
-}
-
-export function useTasksByStatus(status: "pending" | "in_progress" | "completed" | "cancelled") {
-  return useQuery(api.queries.getTasksByStatus, { status });
-}
-
-export function useCreateTask() {
-  return useMutation(api.mutations.createTask);
-}
-
-export function useUpdateTaskStatus() {
-  return useMutation(api.mutations.updateTaskStatus);
-}
-
-export function useAssignTask() {
-  return useMutation(api.mutations.assignTask);
-}
