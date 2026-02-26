@@ -13,6 +13,7 @@ export async function middleware(request: any) {
   const isApiAuthRoute = request.nextUrl.pathname.startsWith("/api/auth")
   const isSeedRoute = request.nextUrl.pathname === "/api/users/seed"
   const isAtlasRoute = request.nextUrl.pathname.startsWith("/api/atlas-parse")
+  const isTaskRoute = request.nextUrl.pathname.startsWith("/api/tasks")
 
   // Allow seed route (public - for creating first user)
   if (isSeedRoute) {
@@ -21,6 +22,11 @@ export async function middleware(request: any) {
 
   // Allow Atlas parse route (public - called from upload page)
   if (isAtlasRoute) {
+    return NextResponse.next()
+  }
+
+  // Allow Task API routes (public - for Athena integration)
+  if (isTaskRoute) {
     return NextResponse.next()
   }
 
