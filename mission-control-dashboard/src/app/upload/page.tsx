@@ -477,7 +477,7 @@ Status: ⏳ Awaiting invoice match`,
           if (!hasNewFormat) {
             resolve({
               success: false,
-              message: "Excel file doesn't have the expected format. Required columns: po_number, product_name, barcode_array, etc.",
+              message: "Excel file doesn't have the expected format. Required columns: po_number, product_name, barcode, etc.",
               poNumber: "",
             });
             return;
@@ -539,7 +539,7 @@ Status: ⏳ Awaiting invoice match`,
             const uniqueRows: any[] = [];
             
             for (const row of poRows) {
-              const rawBarcode = row.barcode_array || row["barcode_array"] || "";
+              const rawBarcode = row.barcode || row["barcode"] || "";
               const barcode = cleanBarcode(rawBarcode);
               
               if (!seenBarcodes.has(barcode)) {
@@ -554,8 +554,8 @@ Status: ⏳ Awaiting invoice match`,
             const orderDate = parseDate(headerRow.po_creation_date || headerRow["po_creation_date"]);
             const deliveryDate = parseDate(headerRow.po_receiving_date || headerRow["po_receiving_date"]);
             
-            // Get supplier from first row
-            const supplier = headerRow.supplier_sku || "Unknown";
+            // Get supplier from first row (supplier_name column)
+            const supplier = headerRow.supplier_name || headerRow["supplier_name"] || "Unknown";
             const customer = headerRow.channel_name || "Talabat";
             const status = headerRow.po_status || "pending";
             const deliveryLocation = "Talabat 3PL"; // Default
@@ -592,7 +592,7 @@ Status: ⏳ Awaiting invoice match`,
 
             // Process line items (only unique barcodes)
             for (const row of uniqueRows) {
-              const rawBarcode = row.barcode_array || row["barcode_array"] || "";
+              const rawBarcode = row.barcode || row["barcode"] || "";
               const barcode = cleanBarcode(rawBarcode);
               const productName = row.product_name || row["product_name"] || "Unknown";
               const quantity = parseInt(row.qty || row["qty"] || "0");
