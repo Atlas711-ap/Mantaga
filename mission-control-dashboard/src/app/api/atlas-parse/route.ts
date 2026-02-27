@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Ollama server config
-const OLLAMA_BASE_URL = "http://100.126.131.51:11434/v1";
-const OLLAMA_MODEL = "qwen3.5:35b";
+// OpenAI config
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 export const config = {
   api: {
@@ -24,13 +24,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No type provided" }, { status: 400 });
     }
 
-    // Read file as base64
+    if (!OPENAI_API_KEY) {
+      return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
+    }
+
+    // Read file and convert to base64
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
+    
+    // For PDF, we need to handle differently - convert to image
+    // Send the PDF base64 directly to GPT-4V which can handle PDFs
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    // Try to send to model - if it fails, user should convert to Excel
-    const parsedData = await parseWithQwen(base64, mimeType, type);
+    // Parse with GPT-4V
+    const parsedData = await parseWithGPT(dataUrl, type);
 
     return NextResponse.json(parsedData);
 
@@ -40,130 +48,112 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function parseWithQwen(base64: string, mimeType: string, type: string): Promise<any> {
-  let systemPrompt = "";
+async function parseWithGPT(dataUrl: string, type: string): Promise<any> {
   let userPrompt = "";
-  
-  const dataUrl = `data:${mimeType};base64,${base64}`;
 
   if (type === "lpo") {
-    systemPrompt = `You are an expert at parsing LPO (Local Purchase Order) documents from UAE/Talabat. Extract structured data from the document. Return ONLY valid JSON with no markdown formatting.`;
+    userPrompt = `You are an expert at parsing LPO (Local Purchase Order) documents from UAE/Talabat. 
 
-    userPrompt = `Extract the following fields from this LPO document:
-- po_number: The purchase order number (e.g., LPO-2026-001234)
-- order_date: The date the order was placed (YYYY-MM-DD format)
-- delivery_date: The expected delivery date (YYYY-MM-DD format)  
-- supplier: The supplier/vendor name
-- delivery_location: Where the order should be delivered (e.g., Talabat 3PL, Darkstore)
-- customer: The customer or channel name (usually "Talabat")
-- total_excl_vat: Total amount excluding VAT (AED)
-- total_vat: VAT amount (usually 5%)
-- total_incl_vat: Total amount including VAT (AED)
-- line_items: Array of items with:
-  - barcode: Product barcode/SKU
-  - product_name: Product name
-  - quantity_ordered: Quantity ordered
-  - unit_cost: Cost per unit (AED)
-  - amount_excl_vat: Line total excluding VAT
-  - vat_pct: VAT percentage (usually 5)
-  - vat_amount: VAT amount for this line
-  - amount_incl_vat: Line total including VAT
-
-Return JSON like:
+Extract the following fields from this LPO document and return ONLY valid JSON:
 {
-  "po_number": "LPO-XXX",
-  "order_date": "2026-01-01",
-  "delivery_date": "2026-01-03",
-  "supplier": "Supplier Name",
-  "delivery_location": "Talabat 3PL",
-  "customer": "Talabat",
-  "total_excl_vat": 1000,
-  "total_vat": 50,
-  "total_incl_vat": 1050,
+  "po_number": "The purchase order number (e.g., LPO-2026-001234)",
+  "order_date": "Date the order was placed (YYYY-MM-DD format)",
+  "delivery_date": "Expected delivery date (YYYY-MM-DD format)",  
+  "supplier": "The supplier/vendor name",
+  "delivery_location": "Where the order should be delivered (e.g., Talabat 3PL, Darkstore)",
+  "customer": "The customer or channel name (usually Talabat)",
+  "total_excl_vat": Total amount excluding VAT (AED) - number only,
+  "total_vat": VAT amount (AED) - number only,
+  "total_incl_vat": Total amount including VAT (AED) - number only,
   "line_items": [
     {
-      "barcode": "123456789",
-      "product_name": "Product Name",
-      "quantity_ordered": 10,
-      "unit_cost": 100,
-      "amount_excl_vat": 1000,
-      "vat_pct": 5,
-      "vat_amount": 50,
-      "amount_incl_vat": 1050
+      "barcode": "Product barcode/SKU",
+      "product_name": "Product name",
+      "quantity_ordered": quantity - number,
+      "unit_cost": Cost per unit (AED) - number,
+      "amount_excl_vat": Line total excluding VAT - number,
+      "vat_pct": VAT percentage (usually 5),
+      "vat_amount": VAT amount for this line - number,
+      "amount_incl_vat": Line total including VAT - number
     }
   ]
 }
 
-If you cannot read a field, use null. Be precise with numbers.`;
+Return ONLY JSON, no markdown. If a field cannot be determined, use null.`;
 
   } else if (type === "invoice") {
-    systemPrompt = `You are an expert at parsing Invoice documents from UAE. Extract structured data from the document. Return ONLY valid JSON with no markdown formatting.`;
+    userPrompt = `You are an expert at parsing Invoice documents from UAE. 
 
-    userPrompt = `Extract the following fields from this Invoice:
-- invoice_number: Invoice number
-- invoice_date: Invoice date (YYYY-MM-DD)
-- po_number: Related PO number if visible
-- customer: Customer name
-- subtotal: Subtotal before VAT (AED)
-- vat_amount: VAT amount (usually 5%)
-- grand_total: Total including VAT (AED)
-- line_items: Array of items with barcode, product_name, quantity_invoiced, unit_rate, taxable_amount, vat_amount
+Extract the following fields and return ONLY valid JSON:
+{
+  "invoice_number": "Invoice number",
+  "invoice_date": "Invoice date (YYYY-MM-DD)",
+  "po_number": "Related PO number if visible",
+  "customer": "Customer name",
+  "subtotal": "Subtotal before VAT (AED) - number",
+  "vat_amount": "VAT amount (AED) - number",
+  "grand_total": "Total including VAT (AED) - number",
+  "line_items": [
+    {
+      "barcode": "Product barcode",
+      "product_name": "Product name", 
+      "quantity_invoiced": quantity - number,
+      "unit_rate": "Unit rate (AED) - number",
+      "taxable_amount": "Taxable amount - number",
+      "vat_amount": "VAT amount - number"
+    }
+  ]
+}
 
-Return JSON format. Be precise with numbers.`;
+Return ONLY JSON, no markdown.`;
   }
 
-  // Try sending as image first
-  const messages: any[] = [
-    { role: "system", content: systemPrompt },
-    { 
-      role: "user", 
-      content: [
-        { type: "text", text: userPrompt },
-        { type: "image_url", image_url: { url: dataUrl } }
-      ]
-    }
-  ];
+  // Call OpenAI API with GPT-4V
+  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: userPrompt },
+            { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
+          ]
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 4096,
+    }),
+  });
 
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("OpenAI API error:", error);
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+
+  // Parse JSON from response
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages,
-        temperature: 0.1,
-        max_tokens: 4096,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      // If it fails, provide helpful error
-      return {
-        error: "Could not process PDF directly. Please convert to Excel format.",
-        details: errorText
-      };
+    // Try to extract JSON from the response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
-
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("No JSON found in response");
-    } catch (parseError: any) {
-      return {
-        error: "Failed to parse structured data",
-        raw_content: content
-      };
-    }
-  } catch (err: any) {
+    throw new Error("No JSON found in response");
+  } catch (parseError: any) {
+    console.error("JSON parse error:", parseError);
+    console.error("Raw response:", content);
     return {
-      error: "Could not process PDF. Please convert to Excel and upload instead.",
-      hint: "Use Excel format for reliable parsing."
+      error: "Failed to parse structured data",
+      raw_content: content
     };
   }
 }
