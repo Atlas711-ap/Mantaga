@@ -501,6 +501,14 @@ Status: ⏳ Awaiting invoice match`,
             try {
               // Handle string dates
               if (typeof dateValue === "string") {
+                // Handle "DD/MM/YYYY HH:MM" or "DD/MM/YYYY HH:MM:SS" format - extract date only
+                const dmymatch = dateValue.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (dmymatch) {
+                  const day = dmymatch[1].padStart(2, '0');
+                  const month = dmymatch[2].padStart(2, '0');
+                  const year = dmymatch[3];
+                  return `${day}/${month}/${year}`;
+                }
                 // If it looks like "2025 12:36-12-30" (weird format), extract the date part
                 const datePart = dateValue.match(/(\d{4})[-/](\d{2})[-/](\d{2})/);
                 if (datePart) {
