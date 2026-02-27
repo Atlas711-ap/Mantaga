@@ -4,20 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const type = formData.get("type") as string | null;
+    const body = await request.json();
+    const { images, type } = body;
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!images || images.length === 0) {
+      return NextResponse.json({ error: "No images provided" }, { status: 400 });
     }
 
     if (!type) {
@@ -28,17 +21,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
     }
 
-    // Read file and convert to base64
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    const mimeType = file.type || "application/pdf";
-    
-    // For PDF, we need to handle differently - convert to image
-    // Send the PDF base64 directly to GPT-4V which can handle PDFs
-    const dataUrl = `data:${mimeType};base64,${base64}`;
-
-    // Parse with GPT-4V
-    const parsedData = await parseWithGPT(dataUrl, type);
+    // Parse with GPT-4V using images
+    const parsedData = await parseWithGPT(images, type);
 
     return NextResponse.json(parsedData);
 
@@ -48,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function parseWithGPT(dataUrl: string, type: string): Promise<any> {
+async function parseWithGPT(images: string[], type: string): Promise<any> {
   let userPrompt = "";
 
   if (type === "lpo") {
@@ -108,6 +92,20 @@ Extract the following fields and return ONLY valid JSON:
 Return ONLY JSON, no markdown.`;
   }
 
+  // Build content array with text and all images
+  const content: any[] = [{ type: "text", text: userPrompt }];
+  
+  // Add all images
+  for (const imageBase64 of images) {
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:image/jpeg;base64,${imageBase64}`,
+        detail: "high"
+      }
+    });
+  }
+
   // Call OpenAI API with GPT-4V
   const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -120,10 +118,7 @@ Return ONLY JSON, no markdown.`;
       messages: [
         {
           role: "user",
-          content: [
-            { type: "text", text: userPrompt },
-            { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
-          ]
+          content: content
         }
       ],
       temperature: 0.1,
@@ -138,22 +133,22 @@ Return ONLY JSON, no markdown.`;
   }
 
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
+  const contentResult = data.choices?.[0]?.message?.content || "";
 
   // Parse JSON from response
   try {
     // Try to extract JSON from the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = contentResult.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
     throw new Error("No JSON found in response");
   } catch (parseError: any) {
     console.error("JSON parse error:", parseError);
-    console.error("Raw response:", content);
+    console.error("Raw response:", contentResult);
     return {
       error: "Failed to parse structured data",
-      raw_content: content
+      raw_content: contentResult
     };
   }
 }

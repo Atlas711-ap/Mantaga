@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import * as XLSX from "xlsx";
@@ -130,6 +130,43 @@ export default function DataUploadPage() {
     } catch (error) {
       console.error("Failed to save chat message:", error);
     }
+  };
+
+  // Convert PDF to images (base64) - client-side using CDN
+  const convertPdfToImages = async (file: File, maxPages: number = 2): Promise<string[]> => {
+    // Load pdf.js from CDN
+    if (!(window as any).pdfjsLib) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      document.head.appendChild(script);
+      await new Promise(resolve => script.onload = resolve);
+      
+      (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    
+    const pdfjs = (window as any).pdfjsLib;
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const images: string[] = [];
+    
+    const numPages = Math.min(pdf.numPages, maxPages);
+    
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      await page.render({ canvasContext: context!, viewport }).promise;
+      const imageBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
+      images.push(imageBase64);
+    }
+    
+    return images;
   };
 
   // Process Daily Stock CSV
@@ -329,15 +366,25 @@ Use the SKU List tab to view and manage all products.`,
     // Handle PDF files - send to Atlas (qwen3.5:35b)
     if (file.name.toLowerCase().endsWith('.pdf')) {
       try {
+        setResult({ success: true, message: "Converting PDF to images..." });
+        
+        // Convert PDF to images client-side
+        const images = await convertPdfToImages(file, 2);
+        
+        if (images.length === 0) {
+          throw new Error('Could not convert PDF to images');
+        }
+        
         setResult({ success: true, message: "Atlas is reading the PDF..." });
         
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('type', 'lpo');
-        
+        // Send images to API
         const response = await fetch('/api/atlas-parse', {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            images: images,
+            type: 'lpo'
+          }),
         });
         
         if (!response.ok) {
