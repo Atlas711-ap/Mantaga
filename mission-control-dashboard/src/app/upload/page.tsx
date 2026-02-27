@@ -519,7 +519,7 @@ Status: ⏳ Awaiting invoice match`,
             }
           };
 
-          // Group rows by PO number
+          // Group rows by PO number, then deduplicate by barcode
           const poGroups: Record<string, any[]> = {};
           for (const row of jsonData) {
             const poNumber = row.po_number || row["po_number"];
@@ -534,7 +534,21 @@ Status: ⏳ Awaiting invoice match`,
 
           // Process each PO
           for (const [poNumber, poRows] of Object.entries(poGroups)) {
-            const headerRow = poRows[0];
+            // Deduplicate by barcode - keep first occurrence only
+            const seenBarcodes = new Set();
+            const uniqueRows: any[] = [];
+            
+            for (const row of poRows) {
+              const rawBarcode = row.barcode_array || row["barcode_array"] || "";
+              const barcode = cleanBarcode(rawBarcode);
+              
+              if (!seenBarcodes.has(barcode)) {
+                seenBarcodes.add(barcode);
+                uniqueRows.push(row);
+              }
+            }
+
+            const headerRow = uniqueRows[0];
             
             // Parse dates
             const orderDate = parseDate(headerRow.po_creation_date || headerRow["po_creation_date"]);
@@ -551,7 +565,7 @@ Status: ⏳ Awaiting invoice match`,
             let totalVat = 0;
             let totalInclVat = 0;
             
-            for (const row of poRows) {
+            for (const row of uniqueRows) {
               const netCost = parseFloat(row.net_cost_excl_vat || row["net_cost_excl_vat"] || "0");
               const vatAmount = parseFloat(row.vat_5_percent || row["vat_5_percent"] || "0");
               const inclVat = parseFloat(row.total_incl_vat || row["total_incl_vat"] || "0");
@@ -574,8 +588,8 @@ Status: ⏳ Awaiting invoice match`,
               status,
             });
 
-            // Process line items
-            for (const row of poRows) {
+            // Process line items (only unique barcodes)
+            for (const row of uniqueRows) {
               const rawBarcode = row.barcode_array || row["barcode_array"] || "";
               const barcode = cleanBarcode(rawBarcode);
               const productName = row.product_name || row["product_name"] || "Unknown";
