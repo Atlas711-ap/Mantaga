@@ -495,7 +495,7 @@ Status: ⏳ Awaiting invoice match`,
             return cleaned || "";
           };
 
-          // Helper to parse date
+          // Helper to parse date - returns DD/MM/YYYY format
           const parseDate = (dateValue: any): string => {
             if (!dateValue) return "";
             try {
@@ -504,29 +504,40 @@ Status: ⏳ Awaiting invoice match`,
                 // If it looks like "2025 12:36-12-30" (weird format), extract the date part
                 const datePart = dateValue.match(/(\d{4})[-/](\d{2})[-/](\d{2})/);
                 if (datePart) {
-                  return `${datePart[1]}-${datePart[2]}-${datePart[3]}`;
+                  return `${datePart[3]}/${datePart[2]}/${datePart[1]}`;
                 }
                 // Handle DD/MM/YYYY format
                 const parts = dateValue.split("/");
                 if (parts.length === 3) {
-                  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                  return dateValue; // Already in DD/MM/YYYY
                 }
                 // Try parsing as normal date
                 const parsed = new Date(dateValue);
                 if (!isNaN(parsed.getTime())) {
-                  return parsed.toISOString().split("T")[0];
+                  const day = String(parsed.getDate()).padStart(2, '0');
+                  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+                  const year = parsed.getFullYear();
+                  return `${day}/${month}/${year}`;
                 }
                 return dateValue;
               }
               // Handle Excel date serial (number)
               if (typeof dateValue === "number") {
                 const date = new Date((dateValue - 25569) * 86400 * 1000);
-                return date.toISOString().split("T")[0];
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
               }
               return String(dateValue);
             } catch {
               return String(dateValue);
             }
+          };
+
+          // Format date to DD/MM/YYYY without time
+          const formatDateDMY = (dateValue: any): string => {
+            return parseDate(dateValue);
           };
 
           // Group rows by PO number, then deduplicate by barcode
@@ -560,9 +571,9 @@ Status: ⏳ Awaiting invoice match`,
 
             const headerRow = uniqueRows[0];
             
-            // Parse dates
-            const orderDate = parseDate(headerRow.po_creation_date || headerRow["po_creation_date"]);
-            const deliveryDate = parseDate(headerRow.po_receiving_date || headerRow["po_receiving_date"]);
+            // Parse dates - keep as DD/MM/YYYY without time
+            const orderDate = formatDateDMY(headerRow.po_creation_date || headerRow["po_creation_date"]);
+            const deliveryDate = formatDateDMY(headerRow.po_receiving_date || headerRow["po_receiving_date"]);
             
             // Get supplier from first row (supplier_name column)
             const supplier = headerRow.supplier_name || headerRow["supplier_name"] || "Unknown";
