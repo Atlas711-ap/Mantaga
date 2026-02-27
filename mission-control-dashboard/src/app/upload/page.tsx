@@ -579,9 +579,8 @@ Status: ⏳ Awaiting invoice match`,
               const rawBarcode = row.barcode_array || row["barcode_array"] || "";
               const barcode = cleanBarcode(rawBarcode);
               const productName = row.product_name || row["product_name"] || "Unknown";
-              const quantity = parseInt(row.sku_id || row["sku_id"] || "0");
+              const quantity = parseInt(row.qty || row["qty"] || "0");
               const unitCost = parseFloat(row.unit_cost || row["unit_cost"] || "0");
-              const discountedUnitCost = parseFloat(row.discounted_unit_cost || row["discounted_unit_cost"] || "0");
               const netCostExclVat = parseFloat(row.net_cost_excl_vat || row["net_cost_excl_vat"] || "0");
               const vatPct = 5;
               const vatAmount = parseFloat(row.vat_5_percent || row["vat_5_percent"] || "0");
@@ -593,7 +592,7 @@ Status: ⏳ Awaiting invoice match`,
                   barcode: barcode,
                   product_name: productName,
                   quantity_ordered: quantity,
-                  unit_cost: discountedUnitCost || unitCost,
+                  unit_cost: unitCost,
                   amount_excl_vat: netCostExclVat,
                   vat_pct: vatPct,
                   vat_amount: vatAmount,
