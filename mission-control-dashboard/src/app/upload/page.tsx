@@ -457,7 +457,7 @@ Status: ⏳ Awaiting invoice match`,
       }
     }
     
-    // Handle Excel/CSV files (existing code)
+    // Handle Excel/CSV files with new format (multiple LPOs supported)
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -468,113 +468,157 @@ Status: ⏳ Awaiting invoice match`,
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-          // Try to find header row
-          const headerRow = jsonData.find((row: any) => 
-            row.po_number || row["PO Number"] || row["PO No"] || row["Order Number"]
+          // Check for new format headers
+          const hasNewFormat = jsonData.length > 0 && (
+            jsonData[0].po_number !== undefined || 
+            jsonData[0]["po_number"] !== undefined
           );
 
-          if (!headerRow) {
+          if (!hasNewFormat) {
             resolve({
               success: false,
-              message: "Could not find PO/LPO information in the file. Please ensure the file has a PO Number column.",
+              message: "Excel file doesn't have the expected format. Required columns: po_number, product_name, barcode_array, etc.",
               poNumber: "",
             });
             return;
           }
 
-          // Parse with user's Excel headers
-          const poNumber = headerRow.po_number || `PO${Date.now()}`;
-          let orderDateValue = headerRow.po_creation_date;
-          // Handle date format - could be different formats
-          let orderDate = new Date().toISOString().split('T')[0];
-          if (orderDateValue) {
+          // Helper to clean barcode
+          const cleanBarcode = (barcode: string): string => {
+            if (!barcode) return "";
+            // Remove brackets and quotes
+            let cleaned = String(barcode).replace(/[\[\]']/g, "");
+            // Remove leading zero if present
+            if (cleaned.startsWith("0")) {
+              cleaned = cleaned.replace(/^0+/, "");
+            }
+            return cleaned || "";
+          };
+
+          // Helper to parse date
+          const parseDate = (dateValue: any): string => {
+            if (!dateValue) return "";
             try {
-              const parsed = new Date(orderDateValue);
-              if (!isNaN(parsed.getTime())) {
-                orderDate = parsed.toISOString().split('T')[0];
+              if (typeof dateValue === "number") {
+                // Excel date serial
+                const date = new Date((dateValue - 25569) * 86400 * 1000);
+                return date.toISOString().split("T")[0];
               }
-            } catch (e) {
-              console.log("Date parse error:", e);
+              const parsed = new Date(dateValue);
+              if (!isNaN(parsed.getTime())) {
+                return parsed.toISOString().split("T")[0];
+              }
+              // Handle DD/MM/YYYY format
+              const parts = String(dateValue).split("/");
+              if (parts.length === 3) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+              }
+              return dateValue;
+            } catch {
+              return String(dateValue);
+            }
+          };
+
+          // Group rows by PO number
+          const poGroups: Record<string, any[]> = {};
+          for (const row of jsonData) {
+            const poNumber = row.po_number || row["po_number"];
+            if (poNumber) {
+              if (!poGroups[poNumber]) poGroups[poNumber] = [];
+              poGroups[poNumber].push(row);
             }
           }
-          
-          const deliveryDate = headerRow.po_expected_delivery_at || '';
-          const supplier = headerRow.supplier_name || "Unknown";
-          const deliveryLocation = headerRow.store_name || "Talabat 3PL";
-          const customer = headerRow.channel_name || "Talabat";
-          
-          // Calculate totals from all rows (ordered_amount includes 5% VAT)
-          let totalInclVat = 0;
-          for (const row of jsonData) {
-            totalInclVat += parseFloat(row.ordered_amount || "0");
-          }
-          const totalExclVat = totalInclVat / 1.05;
-          const vat = totalExclVat * 0.05;
 
-          // Get status from first row
-          const status = headerRow.po_status || "pending";
+          let totalLposProcessed = 0;
+          let totalLineItemsProcessed = 0;
 
-          // Insert LPO header
-          await insertLpo({
-            po_number: poNumber,
-            order_date: orderDate,
-            delivery_date: deliveryDate,
-            supplier,
-            delivery_location: deliveryLocation,
-            customer,
-            total_excl_vat: totalExclVat,
-            total_vat: vat,
-            total_incl_vat: totalInclVat,
-            status,
-          });
-
-          // Process line items (rows with SKU info)
-          let lineItemsCount = 0;
-          for (const row of jsonData) {
-            const barcode = row.barcode_array || row.barcode || row.sku_id || "";
-            const productName = row.product_name || "Unknown";
-            const quantity = parseInt(row.ordered_qty || row.quantity || "0");
-            const unitCost = parseFloat(row.unit_cost || "0");
-            // ordered_amount includes 5% VAT, so extract base amount
-            const amountInclVat = parseFloat(row.ordered_amount || "0");
-            const amountExclVat = amountInclVat / 1.05;
-            const vatAmount = amountExclVat * 0.05;
-            const vatPct = 5;
-
-            if (barcode && productName && quantity > 0) {
-              await insertLpoLineItem({
-                po_number: poNumber,
-                barcode: String(barcode),
-                product_name: productName,
-                quantity_ordered: quantity,
-                unit_cost: unitCost,
-                amount_excl_vat: amountExclVat,
-                vat_pct: vatPct,
-                vat_amount: vatAmount,
-                amount_incl_vat: amountInclVat,
-              });
-              lineItemsCount++;
+          // Process each PO
+          for (const [poNumber, poRows] of Object.entries(poGroups)) {
+            const headerRow = poRows[0];
+            
+            // Parse dates
+            const orderDate = parseDate(headerRow.po_creation_date || headerRow["po_creation_date"]);
+            const deliveryDate = parseDate(headerRow.po_receiving_date || headerRow["po_receiving_date"]);
+            
+            // Get supplier from first row
+            const supplier = headerRow.supplier_sku || "Unknown";
+            const customer = headerRow.channel_name || "Talabat";
+            const status = headerRow.po_status || "pending";
+            const deliveryLocation = "Talabat 3PL"; // Default
+            
+            // Calculate totals for this PO
+            let totalExclVat = 0;
+            let totalVat = 0;
+            let totalInclVat = 0;
+            
+            for (const row of poRows) {
+              const netCost = parseFloat(row.net_cost_excl_vat || row["net_cost_excl_vat"] || "0");
+              const vatAmount = parseFloat(row.vat_5_percent || row["vat_5_percent"] || "0");
+              const inclVat = parseFloat(row.total_incl_vat || row["total_incl_vat"] || "0");
+              totalExclVat += netCost;
+              totalVat += vatAmount;
+              totalInclVat += inclVat;
             }
+
+            // Insert LPO header
+            await insertLpo({
+              po_number: poNumber,
+              order_date: orderDate,
+              delivery_date: deliveryDate,
+              supplier,
+              delivery_location: deliveryLocation,
+              customer,
+              total_excl_vat: totalExclVat,
+              total_vat: totalVat,
+              total_incl_vat: totalInclVat,
+              status,
+            });
+
+            // Process line items
+            for (const row of poRows) {
+              const rawBarcode = row.barcode_array || row["barcode_array"] || "";
+              const barcode = cleanBarcode(rawBarcode);
+              const productName = row.product_name || row["product_name"] || "Unknown";
+              const quantity = parseInt(row.sku_id || row["sku_id"] || "0");
+              const unitCost = parseFloat(row.unit_cost || row["unit_cost"] || "0");
+              const discountedUnitCost = parseFloat(row.discounted_unit_cost || row["discounted_unit_cost"] || "0");
+              const netCostExclVat = parseFloat(row.net_cost_excl_vat || row["net_cost_excl_vat"] || "0");
+              const vatPct = 5;
+              const vatAmount = parseFloat(row.vat_5_percent || row["vat_5_percent"] || "0");
+              const amountInclVat = parseFloat(row.total_incl_vat || row["total_incl_vat"] || "0");
+
+              if (barcode && productName && quantity > 0) {
+                await insertLpoLineItem({
+                  po_number: poNumber,
+                  barcode: barcode,
+                  product_name: productName,
+                  quantity_ordered: quantity,
+                  unit_cost: discountedUnitCost || unitCost,
+                  amount_excl_vat: netCostExclVat,
+                  vat_pct: vatPct,
+                  vat_amount: vatAmount,
+                  amount_incl_vat: amountInclVat,
+                });
+                totalLineItemsProcessed++;
+              }
+            }
+            totalLposProcessed++;
           }
 
           resolve({
             success: true,
-            message: `📄 LPO RECEIVED — ${poNumber}
+            message: `📄 LPOs PROCESSED — ${totalLposProcessed} PO(s)
 
 ────────────────────────────────────────
-Order Date: ${orderDate}
-Delivery Date: ${deliveryDate}
-Supplier: ${supplier}
-Delivery to: ${deliveryLocation}
+✅ Line items: ${totalLineItemsProcessed}
+Total LPOs: ${totalLposProcessed}
 
-Line items: ${lineItemsCount}
-Total (excl. VAT): AED ${totalExclVat.toLocaleString()}
-VAT (5%): AED ${vat.toLocaleString()}
-Total (incl. VAT): AED ${totalInclVat.toLocaleString()}
+Data saved to database.
 
-Status: ⏳ Awaiting invoice match`,
-            poNumber,
+View in LPO tab.`,
+            poNumber: "Multiple",
           });
+          return;
         } catch (error) {
           resolve({
             success: false,
