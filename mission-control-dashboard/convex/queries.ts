@@ -193,18 +193,139 @@ export const getInvoiceLineItemsByInvoiceNumber = query({
 
 export const getBrandPerformance = query({
   handler: async (ctx) => {
-    return await ctx.db.query("brand_performance").collect();
+    // Get all LPO line items
+    const lineItems = await ctx.db.query("lpo_line_items").collect();
+    // Get all LPO headers
+    const lpoHeaders = await ctx.db.query("lpo_table").collect();
+    
+    // Create a map of po_number -> lpo_header
+    const lpoMap = new Map();
+    for (const lpo of lpoHeaders) {
+      lpoMap.set(lpo.po_number, lpo);
+    }
+    
+    // Merge data from lpo_table + lpo_line_items
+    const results = [];
+    for (const item of lineItems) {
+      const lpo = lpoMap.get(item.po_number);
+      if (!lpo) continue;
+      
+      // Parse order_date to get year and month
+      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
+      const year = orderDate.getFullYear();
+      const month = orderDate.getMonth() + 1;
+      
+      const qtyOrdered = item.quantity_ordered || 0;
+      const qtyDelivered = item.quantity_delivered || 0;
+      const gapValue = qtyOrdered - qtyDelivered;
+      const serviceLevelPct = qtyOrdered > 0 ? (qtyDelivered / qtyOrdered) * 100 : 0;
+      
+      const commissionPct = lpo.commission_pct || 0;
+      const totalInclVatInvoiced = item.total_incl_vat_invoiced || 0;
+      const commissionAed = totalInclVatInvoiced * (commissionPct / 100);
+      
+      results.push({
+        _id: item._id,
+        year,
+        month,
+        po_number: item.po_number,
+        po_date: lpo.order_date || "",
+        customer: lpo.customer || "",
+        brand: item.brand || "",
+        client: item.client || "",
+        invoice_number: item.invoice_number || "",
+        invoice_date: item.invoice_date || "",
+        barcode: item.barcode,
+        product_name: item.product_name,
+        quantity_ordered: qtyOrdered,
+        quantity_delivered: qtyDelivered,
+        unit_cost: item.unit_cost || 0,
+        lpo_value_excl_vat: item.amount_excl_vat || 0,
+        lpo_value_incl_vat: item.amount_incl_vat || 0,
+        invoiced_value_excl_vat: item.amount_invoiced || 0,
+        invoiced_value_incl_vat: item.amount_invoiced ? item.amount_invoiced * 1.05 : 0,
+        vat_amount_invoiced: item.vat_amount_invoiced || 0,
+        total_incl_vat_invoiced: totalInclVatInvoiced,
+        gap_value: gapValue,
+        service_level_pct: Math.round(serviceLevelPct * 100) / 100,
+        commission_pct: commissionPct,
+        commission_aed: Math.round(commissionAed * 100) / 100,
+        match_status: Math.abs(gapValue) <= 2 ? "MATCHED" : "DISCREPANCY",
+      });
+    }
+    
+    return results;
   },
 });
 
 export const getBrandPerformanceByYearMonth = query({
   args: { year: v.number(), month: v.number() },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("brand_performance")
-      .withIndex("by_year_month", (q) => 
-        q.eq("year", args.year).eq("month", args.month))
-      .collect();
+    // Get all LPO line items
+    const lineItems = await ctx.db.query("lpo_line_items").collect();
+    // Get all LPO headers
+    const lpoHeaders = await ctx.db.query("lpo_table").collect();
+    
+    // Create a map of po_number -> lpo_header
+    const lpoMap = new Map();
+    for (const lpo of lpoHeaders) {
+      lpoMap.set(lpo.po_number, lpo);
+    }
+    
+    // Merge and filter by year/month
+    const results = [];
+    for (const item of lineItems) {
+      const lpo = lpoMap.get(item.po_number);
+      if (!lpo) continue;
+      
+      // Parse order_date to get year and month
+      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
+      const itemYear = orderDate.getFullYear();
+      const itemMonth = orderDate.getMonth() + 1;
+      
+      // Filter by requested year/month
+      if (itemYear !== args.year || itemMonth !== args.month) continue;
+      
+      const qtyOrdered = item.quantity_ordered || 0;
+      const qtyDelivered = item.quantity_delivered || 0;
+      const gapValue = qtyOrdered - qtyDelivered;
+      const serviceLevelPct = qtyOrdered > 0 ? (qtyDelivered / qtyOrdered) * 100 : 0;
+      
+      const commissionPct = lpo.commission_pct || 0;
+      const totalInclVatInvoiced = item.total_incl_vat_invoiced || 0;
+      const commissionAed = totalInclVatInvoiced * (commissionPct / 100);
+      
+      results.push({
+        _id: item._id,
+        year: itemYear,
+        month: itemMonth,
+        po_number: item.po_number,
+        po_date: lpo.order_date || "",
+        customer: lpo.customer || "",
+        brand: item.brand || "",
+        client: item.client || "",
+        invoice_number: item.invoice_number || "",
+        invoice_date: item.invoice_date || "",
+        barcode: item.barcode,
+        product_name: item.product_name,
+        quantity_ordered: qtyOrdered,
+        quantity_delivered: qtyDelivered,
+        unit_cost: item.unit_cost || 0,
+        lpo_value_excl_vat: item.amount_excl_vat || 0,
+        lpo_value_incl_vat: item.amount_incl_vat || 0,
+        invoiced_value_excl_vat: item.amount_invoiced || 0,
+        invoiced_value_incl_vat: item.amount_invoiced ? item.amount_invoiced * 1.05 : 0,
+        vat_amount_invoiced: item.vat_amount_invoiced || 0,
+        total_incl_vat_invoiced: totalInclVatInvoiced,
+        gap_value: gapValue,
+        service_level_pct: Math.round(serviceLevelPct * 100) / 100,
+        commission_pct: commissionPct,
+        commission_aed: Math.round(commissionAed * 100) / 100,
+        match_status: Math.abs(gapValue) <= 2 ? "MATCHED" : "DISCREPANCY",
+      });
+    }
+    
+    return results;
   },
 });
 
@@ -216,19 +337,71 @@ export const getBrandPerformanceWithFilters = query({
     customer: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let results = await ctx.db.query("brand_performance").collect();
+    // Get all LPO line items
+    const lineItems = await ctx.db.query("lpo_line_items").collect();
+    // Get all LPO headers
+    const lpoHeaders = await ctx.db.query("lpo_table").collect();
     
-    if (args.year) {
-      results = results.filter(r => r.year === args.year);
+    // Create a map of po_number -> lpo_header
+    const lpoMap = new Map();
+    for (const lpo of lpoHeaders) {
+      lpoMap.set(lpo.po_number, lpo);
     }
-    if (args.month) {
-      results = results.filter(r => r.month === args.month);
-    }
-    if (args.brand) {
-      results = results.filter(r => r.brand && r.brand === args.brand);
-    }
-    if (args.customer) {
-      results = results.filter(r => r.customer && r.customer === args.customer);
+    
+    // Merge and filter
+    const results = [];
+    for (const item of lineItems) {
+      const lpo = lpoMap.get(item.po_number);
+      if (!lpo) continue;
+      
+      // Parse order_date to get year and month
+      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
+      const itemYear = orderDate.getFullYear();
+      const itemMonth = orderDate.getMonth() + 1;
+      
+      // Apply filters
+      if (args.year && itemYear !== args.year) continue;
+      if (args.month && itemMonth !== args.month) continue;
+      if (args.brand && item.brand !== args.brand) continue;
+      if (args.customer && lpo.customer !== args.customer) continue;
+      
+      const qtyOrdered = item.quantity_ordered || 0;
+      const qtyDelivered = item.quantity_delivered || 0;
+      const gapValue = qtyOrdered - qtyDelivered;
+      const serviceLevelPct = qtyOrdered > 0 ? (qtyDelivered / qtyOrdered) * 100 : 0;
+      
+      const commissionPct = lpo.commission_pct || 0;
+      const totalInclVatInvoiced = item.total_incl_vat_invoiced || 0;
+      const commissionAed = totalInclVatInvoiced * (commissionPct / 100);
+      
+      results.push({
+        _id: item._id,
+        year: itemYear,
+        month: itemMonth,
+        po_number: item.po_number,
+        po_date: lpo.order_date || "",
+        customer: lpo.customer || "",
+        brand: item.brand || "",
+        client: item.client || "",
+        invoice_number: item.invoice_number || "",
+        invoice_date: item.invoice_date || "",
+        barcode: item.barcode,
+        product_name: item.product_name,
+        quantity_ordered: qtyOrdered,
+        quantity_delivered: qtyDelivered,
+        unit_cost: item.unit_cost || 0,
+        lpo_value_excl_vat: item.amount_excl_vat || 0,
+        lpo_value_incl_vat: item.amount_incl_vat || 0,
+        invoiced_value_excl_vat: item.amount_invoiced || 0,
+        invoiced_value_incl_vat: item.amount_invoiced ? item.amount_invoiced * 1.05 : 0,
+        vat_amount_invoiced: item.vat_amount_invoiced || 0,
+        total_incl_vat_invoiced: totalInclVatInvoiced,
+        gap_value: gapValue,
+        service_level_pct: Math.round(serviceLevelPct * 100) / 100,
+        commission_pct: commissionPct,
+        commission_aed: Math.round(commissionAed * 100) / 100,
+        match_status: Math.abs(gapValue) <= 2 ? "MATCHED" : "DISCREPANCY",
+      });
     }
     
     return results;
@@ -238,32 +411,56 @@ export const getBrandPerformanceWithFilters = query({
 export const getBrandPerformanceMTD = query({
   handler: async (ctx) => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
+    const targetYear = now.getFullYear();
+    const targetMonth = now.getMonth() + 1;
     
-    const results = await ctx.db
-      .query("brand_performance")
-      .withIndex("by_year_month", (q) => 
-        q.eq("year", year).eq("month", month))
-      .collect();
+    // Get all LPO line items
+    const lineItems = await ctx.db.query("lpo_line_items").collect();
+    // Get all LPO headers
+    const lpoHeaders = await ctx.db.query("lpo_table").collect();
+    
+    // Create a map of po_number -> lpo_header
+    const lpoMap = new Map();
+    for (const lpo of lpoHeaders) {
+      lpoMap.set(lpo.po_number, lpo);
+    }
+    
+    // Filter for current month
+    const results = [];
+    for (const item of lineItems) {
+      const lpo = lpoMap.get(item.po_number);
+      if (!lpo) continue;
+      
+      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
+      const itemYear = orderDate.getFullYear();
+      const itemMonth = orderDate.getMonth() + 1;
+      
+      if (itemYear === targetYear && itemMonth === targetMonth) {
+        results.push({
+          lpo_value_incl_vat: item.amount_incl_vat || 0,
+          invoiced_value_incl_vat: item.total_incl_vat_invoiced || 0,
+          gap_value: (item.quantity_ordered || 0) - (item.quantity_delivered || 0),
+          commission_pct: lpo.commission_pct || 0,
+          total_incl_vat_invoiced: item.total_incl_vat_invoiced || 0,
+        });
+      }
+    }
     
     // Aggregate metrics
     const metrics = results.reduce((acc, r) => ({
-      total_po_value: acc.total_po_value + (r.lpo_value_incl_vat || 0),
-      total_sales: acc.total_sales + (r.invoiced_value_incl_vat || 0),
-      total_gap: acc.total_gap + (r.gap_value || 0),
-      total_commission: acc.total_commission + (r.commission_aed || 0),
+      total_po_value: acc.total_po_value + r.lpo_value_incl_vat,
+      total_sales: acc.total_sales + r.invoiced_value_incl_vat,
+      total_gap: acc.total_gap + r.gap_value,
+      total_commission: acc.total_commission + (r.total_incl_vat_invoiced * r.commission_pct / 100),
       count: acc.count + 1,
     }), { total_po_value: 0, total_sales: 0, total_gap: 0, total_commission: 0, count: 0 });
     
     // Calculate weighted average service level
-    const totalOrdered = results.reduce((sum, r) => sum + (r.lpo_value_incl_vat || 0), 0);
-    const totalInvoiced = results.reduce((sum, r) => sum + (r.invoiced_value_incl_vat || 0), 0);
-    const serviceLevel = totalOrdered > 0 ? (totalInvoiced / totalOrdered) * 100 : 0;
+    const serviceLevel = metrics.total_po_value > 0 ? (metrics.total_sales / metrics.total_po_value) * 100 : 0;
     
     return {
-      year,
-      month,
+      year: targetYear,
+      month: targetMonth,
       ...metrics,
       service_level_pct: Math.round(serviceLevel * 100) / 100,
     };
@@ -273,27 +470,53 @@ export const getBrandPerformanceMTD = query({
 export const getBrandPerformanceYTD = query({
   handler: async (ctx) => {
     const now = new Date();
-    const year = now.getFullYear();
+    const targetYear = now.getFullYear();
     
-    const all = await ctx.db.query("brand_performance").collect();
-    const results = all.filter(r => r.year === year);
+    // Get all LPO line items
+    const lineItems = await ctx.db.query("lpo_line_items").collect();
+    // Get all LPO headers
+    const lpoHeaders = await ctx.db.query("lpo_table").collect();
+    
+    // Create a map of po_number -> lpo_header
+    const lpoMap = new Map();
+    for (const lpo of lpoHeaders) {
+      lpoMap.set(lpo.po_number, lpo);
+    }
+    
+    // Filter for current year
+    const results = [];
+    for (const item of lineItems) {
+      const lpo = lpoMap.get(item.po_number);
+      if (!lpo) continue;
+      
+      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
+      const itemYear = orderDate.getFullYear();
+      
+      if (itemYear === targetYear) {
+        results.push({
+          lpo_value_incl_vat: item.amount_incl_vat || 0,
+          invoiced_value_incl_vat: item.total_incl_vat_invoiced || 0,
+          gap_value: (item.quantity_ordered || 0) - (item.quantity_delivered || 0),
+          commission_pct: lpo.commission_pct || 0,
+          total_incl_vat_invoiced: item.total_incl_vat_invoiced || 0,
+        });
+      }
+    }
     
     // Aggregate metrics
     const metrics = results.reduce((acc, r) => ({
-      total_po_value: acc.total_po_value + (r.lpo_value_incl_vat || 0),
-      total_sales: acc.total_sales + (r.invoiced_value_incl_vat || 0),
-      total_gap: acc.total_gap + (r.gap_value || 0),
-      total_commission: acc.total_commission + (r.commission_aed || 0),
+      total_po_value: acc.total_po_value + r.lpo_value_incl_vat,
+      total_sales: acc.total_sales + r.invoiced_value_incl_vat,
+      total_gap: acc.total_gap + r.gap_value,
+      total_commission: acc.total_commission + (r.total_incl_vat_invoiced * r.commission_pct / 100),
       count: acc.count + 1,
     }), { total_po_value: 0, total_sales: 0, total_gap: 0, total_commission: 0, count: 0 });
     
     // Calculate weighted average service level
-    const totalOrdered = results.reduce((sum, r) => sum + (r.lpo_value_incl_vat || 0), 0);
-    const totalInvoiced = results.reduce((sum, r) => sum + (r.invoiced_value_incl_vat || 0), 0);
-    const serviceLevel = totalOrdered > 0 ? (totalInvoiced / totalOrdered) * 100 : 0;
+    const serviceLevel = metrics.total_po_value > 0 ? (metrics.total_sales / metrics.total_po_value) * 100 : 0;
     
     return {
-      year,
+      year: targetYear,
       ...metrics,
       service_level_pct: Math.round(serviceLevel * 100) / 100,
     };
