@@ -4,21 +4,33 @@ import { NextRequest, NextResponse } from "next/server";
 const OLLAMA_BASE_URL = "http://100.126.131.51:11434/v1";
 const OLLAMA_MODEL = "qwen3.5:35b";
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { images, type, filename } = body;
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    const type = formData.get("type") as string | null;
 
-    if (!images || images.length === 0) {
-      return NextResponse.json({ error: "No images provided" }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     if (!type) {
       return NextResponse.json({ error: "No type provided" }, { status: 400 });
     }
 
-    // Parse with qwen3.5:35b
-    const parsedData = await parseWithQwen(images, type);
+    // Read file as base64
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const mimeType = file.type || "application/pdf";
+
+    // Try to send to model - if it fails, user should convert to Excel
+    const parsedData = await parseWithQwen(base64, mimeType, type);
 
     return NextResponse.json(parsedData);
 
@@ -28,13 +40,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function parseWithQwen(images: string[], type: string): Promise<any> {
-  // Build the prompt based on document type
+async function parseWithQwen(base64: string, mimeType: string, type: string): Promise<any> {
   let systemPrompt = "";
   let userPrompt = "";
+  
+  const dataUrl = `data:${mimeType};base64,${base64}`;
 
   if (type === "lpo") {
-    systemPrompt = `You are an expert at parsing LPO (Local Purchase Order) documents from UAE/Talabat. Extract structured data from the provided document images. Return ONLY valid JSON with no markdown formatting.`;
+    systemPrompt = `You are an expert at parsing LPO (Local Purchase Order) documents from UAE/Talabat. Extract structured data from the document. Return ONLY valid JSON with no markdown formatting.`;
 
     userPrompt = `Extract the following fields from this LPO document:
 - po_number: The purchase order number (e.g., LPO-2026-001234)
@@ -44,7 +57,7 @@ async function parseWithQwen(images: string[], type: string): Promise<any> {
 - delivery_location: Where the order should be delivered (e.g., Talabat 3PL, Darkstore)
 - customer: The customer or channel name (usually "Talabat")
 - total_excl_vat: Total amount excluding VAT (AED)
-- total_vat: VAT amount (usually 5% of subtotal)
+- total_vat: VAT amount (usually 5%)
 - total_incl_vat: Total amount including VAT (AED)
 - line_items: Array of items with:
   - barcode: Product barcode/SKU
@@ -84,7 +97,7 @@ Return JSON like:
 If you cannot read a field, use null. Be precise with numbers.`;
 
   } else if (type === "invoice") {
-    systemPrompt = `You are an expert at parsing Invoice documents from UAE. Extract structured data from the provided document images. Return ONLY valid JSON with no markdown formatting.`;
+    systemPrompt = `You are an expert at parsing Invoice documents from UAE. Extract structured data from the document. Return ONLY valid JSON with no markdown formatting.`;
 
     userPrompt = `Extract the following fields from this Invoice:
 - invoice_number: Invoice number
@@ -99,63 +112,58 @@ If you cannot read a field, use null. Be precise with numbers.`;
 Return JSON format. Be precise with numbers.`;
   }
 
-  // Prepare messages with image (send first page only to keep it simple)
+  // Try sending as image first
   const messages: any[] = [
-    {
-      role: "system",
-      content: systemPrompt
-    },
-    {
-      role: "user",
+    { role: "system", content: systemPrompt },
+    { 
+      role: "user", 
       content: [
         { type: "text", text: userPrompt },
-        {
-          type: "image_url",
-          image_url: {
-            url: `data:image/png;base64,${images[0]}`
-          }
-        }
+        { type: "image_url", image_url: { url: dataUrl } }
       ]
     }
   ];
 
-  // Call Ollama API
-  const response = await fetch(`${OLLAMA_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      messages,
-      temperature: 0.1,
-      max_tokens: 4096,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Ollama API error: ${response.status} - ${error}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-
-  // Parse JSON from response
   try {
-    // Try to extract JSON from the response (it might have markdown wrappers)
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    const response = await fetch(`${OLLAMA_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages,
+        temperature: 0.1,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      // If it fails, provide helpful error
+      return {
+        error: "Could not process PDF directly. Please convert to Excel format.",
+        details: errorText
+      };
     }
-    throw new Error("No JSON found in response");
-  } catch (parseError: any) {
-    console.error("JSON parse error:", parseError);
-    console.error("Raw response:", content);
-    // Return raw content if JSON parsing fails
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      throw new Error("No JSON found in response");
+    } catch (parseError: any) {
+      return {
+        error: "Failed to parse structured data",
+        raw_content: content
+      };
+    }
+  } catch (err: any) {
     return {
-      error: "Failed to parse structured data",
-      raw_content: content
+      error: "Could not process PDF. Please convert to Excel and upload instead.",
+      hint: "Use Excel format for reliable parsing."
     };
   }
 }

@@ -323,59 +323,21 @@ Use the SKU List tab to view and manage all products.`,
     });
   };
 
-  // Convert PDF to images (base64) - client-side
-  const convertPdfToImages = async (file: File, maxPages: number = 3): Promise<string[]> => {
-    // Dynamically import pdf.js only on client side
-    const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const images: string[] = [];
-    
-    const numPages = Math.min(pdf.numPages, maxPages);
-    
-    for (let i = 1; i <= numPages; i++) {
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2.0 });
-      
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      
-      await page.render({ canvasContext: context!, viewport, canvas }).promise;
-      const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
-      images.push(imageBase64);
-    }
-    
-    return images;
-  };
-
   // Process LPO - handles PDF (via qwen3.5:35b) and Excel
   const processLpo = async (file: File): Promise<{ success: boolean; message: string; poNumber: string }> => {
     
     // Handle PDF files - send to Atlas (qwen3.5:35b)
     if (file.name.toLowerCase().endsWith('.pdf')) {
       try {
-        // Convert PDF to images first (client-side)
-        setResult({ success: true, message: "Converting PDF to images..." });
+        setResult({ success: true, message: "Atlas is reading the PDF..." });
         
-        const images = await convertPdfToImages(file, 3);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'lpo');
         
-        if (images.length === 0) {
-          throw new Error('Could not convert PDF to images');
-        }
-        
-        // Send first page image to API (qwen3.5:35b can handle multiple but let's start with 1)
         const response = await fetch('/api/atlas-parse', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            images: images,
-            type: 'lpo',
-            filename: file.name,
-          }),
+          body: formData,
         });
         
         if (!response.ok) {
