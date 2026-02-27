@@ -499,21 +499,31 @@ Status: ⏳ Awaiting invoice match`,
           const parseDate = (dateValue: any): string => {
             if (!dateValue) return "";
             try {
+              // Handle string dates
+              if (typeof dateValue === "string") {
+                // If it looks like "2025 12:36-12-30" (weird format), extract the date part
+                const datePart = dateValue.match(/(\d{4})[-/](\d{2})[-/](\d{2})/);
+                if (datePart) {
+                  return `${datePart[1]}-${datePart[2]}-${datePart[3]}`;
+                }
+                // Handle DD/MM/YYYY format
+                const parts = dateValue.split("/");
+                if (parts.length === 3) {
+                  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+                // Try parsing as normal date
+                const parsed = new Date(dateValue);
+                if (!isNaN(parsed.getTime())) {
+                  return parsed.toISOString().split("T")[0];
+                }
+                return dateValue;
+              }
+              // Handle Excel date serial (number)
               if (typeof dateValue === "number") {
-                // Excel date serial
                 const date = new Date((dateValue - 25569) * 86400 * 1000);
                 return date.toISOString().split("T")[0];
               }
-              const parsed = new Date(dateValue);
-              if (!isNaN(parsed.getTime())) {
-                return parsed.toISOString().split("T")[0];
-              }
-              // Handle DD/MM/YYYY format
-              const parts = String(dateValue).split("/");
-              if (parts.length === 3) {
-                return `${parts[2]}-${parts[1]}-${parts[0]}`;
-              }
-              return dateValue;
+              return String(dateValue);
             } catch {
               return String(dateValue);
             }
