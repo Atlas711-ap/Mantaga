@@ -842,7 +842,7 @@ export const syncBrandPerformance = mutation({
         year,
         month,
         po_number,
-        po_date: lpo.delivery_date || lpo.order_date,
+        po_date: lpo.order_date,
         customer: lpo.customer,
         brand: lpo.brand,
         client: lpo.client,
