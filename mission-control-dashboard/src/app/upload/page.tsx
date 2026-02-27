@@ -560,18 +560,20 @@ Status: ⏳ Awaiting invoice match`,
             const status = headerRow.po_status || "pending";
             const deliveryLocation = "Talabat 3PL"; // Default
             
-            // Calculate totals for this PO
+            // Calculate totals for this PO (from qty x unit_cost)
             let totalExclVat = 0;
             let totalVat = 0;
             let totalInclVat = 0;
             
             for (const row of uniqueRows) {
-              const netCost = parseFloat(row.net_cost_excl_vat || row["net_cost_excl_vat"] || "0");
-              const vatAmount = parseFloat(row.vat_5_percent || row["vat_5_percent"] || "0");
-              const inclVat = parseFloat(row.total_incl_vat || row["total_incl_vat"] || "0");
-              totalExclVat += netCost;
-              totalVat += vatAmount;
-              totalInclVat += inclVat;
+              const qty = parseInt(row.qty || row["qty"] || "0");
+              const unitCost = parseFloat(row.unit_cost || row["unit_cost"] || "0");
+              const lineExclVat = qty * unitCost;
+              const lineVat = lineExclVat * 0.05;
+              const lineInclVat = lineExclVat + lineVat;
+              totalExclVat += lineExclVat;
+              totalVat += lineVat;
+              totalInclVat += lineInclVat;
             }
 
             // Insert LPO header
@@ -595,22 +597,25 @@ Status: ⏳ Awaiting invoice match`,
               const productName = row.product_name || row["product_name"] || "Unknown";
               const quantity = parseInt(row.qty || row["qty"] || "0");
               const unitCost = parseFloat(row.unit_cost || row["unit_cost"] || "0");
-              const netCostExclVat = parseFloat(row.net_cost_excl_vat || row["net_cost_excl_vat"] || "0");
               const vatPct = 5;
-              const vatAmount = parseFloat(row.vat_5_percent || row["vat_5_percent"] || "0");
-              const amountInclVat = parseFloat(row.total_incl_vat || row["total_incl_vat"] || "0");
 
               if (barcode && productName && quantity > 0) {
+                // Calculate ordered amount (qty x unit cost x 1.05 for VAT)
+                const orderedAmtExclVat = quantity * unitCost;
+                const orderedAmtVat = orderedAmtExclVat * 0.05;
+                const orderedAmtInclVat = orderedAmtExclVat + orderedAmtVat;
+                
                 await insertLpoLineItem({
                   po_number: poNumber,
                   barcode: barcode,
                   product_name: productName,
                   quantity_ordered: quantity,
+                  quantity_delivered: 0, // Will be entered manually later
                   unit_cost: unitCost,
-                  amount_excl_vat: netCostExclVat,
+                  amount_excl_vat: orderedAmtExclVat,
                   vat_pct: vatPct,
-                  vat_amount: vatAmount,
-                  amount_incl_vat: amountInclVat,
+                  vat_amount: orderedAmtVat,
+                  amount_incl_vat: orderedAmtInclVat,
                 });
                 totalLineItemsProcessed++;
               }
