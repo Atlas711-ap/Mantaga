@@ -548,6 +548,36 @@ Status: ⏳ Awaiting invoice match`,
             return parseDate(dateValue);
           };
 
+          // Parse date to YYYY-MM-DD format for database storage
+          const parseDateISO = (dateValue: any): string => {
+            if (!dateValue) return "";
+            try {
+              if (typeof dateValue === "string") {
+                // Handle "DD/MM/YYYY HH:MM" format
+                const dmymatch = dateValue.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (dmymatch) {
+                  const day = dmymatch[1].padStart(2, '0');
+                  const month = dmymatch[2].padStart(2, '0');
+                  const year = dmymatch[3];
+                  return `${year}-${month}-${day}`;
+                }
+                // Handle "YYYY-MM-DD" format
+                const ymdmatch = dateValue.match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
+                if (ymdmatch) {
+                  return dateValue;
+                }
+              }
+              // Handle Excel date serial (number)
+              if (typeof dateValue === "number") {
+                const date = new Date((dateValue - 25569) * 86400 * 1000);
+                return date.toISOString().split("T")[0];
+              }
+              return String(dateValue);
+            } catch {
+              return String(dateValue);
+            }
+          };
+
           // Group rows by PO number, then deduplicate by barcode
           const poGroups: Record<string, any[]> = {};
           for (const row of jsonData) {
@@ -579,9 +609,9 @@ Status: ⏳ Awaiting invoice match`,
 
             const headerRow = uniqueRows[0];
             
-            // Parse dates - keep as DD/MM/YYYY without time
-            const orderDate = formatDateDMY(headerRow.po_creation_date || headerRow["po_creation_date"]);
-            const deliveryDate = formatDateDMY(headerRow.po_receiving_date || headerRow["po_receiving_date"]);
+            // Parse dates - store as YYYY-MM-DD in database
+            const orderDate = parseDateISO(headerRow.po_creation_date || headerRow["po_creation_date"]);
+            const deliveryDate = parseDateISO(headerRow.po_receiving_date || headerRow["po_receiving_date"]);
             
             // Get supplier from first row (supplier_name column)
             const supplier = headerRow.supplier_name || headerRow["supplier_name"] || "Unknown";
