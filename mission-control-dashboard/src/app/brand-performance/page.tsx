@@ -85,9 +85,10 @@ export default function BrandPerformancePage() {
   const currentMonth = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
   
+  // MTD always uses current real month/year (not affected by filters)
   const mtdData = useMemo(() => {
-    return filteredData.filter(d => d.month === currentMonth && d.year === currentYear);
-  }, [filteredData]);
+    return (brandData || []).filter(d => d.month === currentMonth && d.year === currentYear);
+  }, [brandData, currentMonth, currentYear]);
 
   const mtdStats = useMemo(() => {
     const totalLpoValue = mtdData.reduce((sum, d) => sum + (d.lpo_value_incl_vat || 0), 0);
@@ -99,10 +100,10 @@ export default function BrandPerformancePage() {
     return { totalLpoValue, totalInvoiced, totalCommission, lpoCount, skuCount, serviceLevel };
   }, [mtdData]);
 
-  // YTD calculations
+  // YTD always uses current real year (not affected by filters)
   const ytdData = useMemo(() => {
-    return filteredData.filter(d => d.year === currentYear);
-  }, [filteredData, currentYear]);
+    return (brandData || []).filter(d => d.year === currentYear);
+  }, [brandData, currentYear]);
 
   const ytdStats = useMemo(() => {
     const totalLpoValue = ytdData.reduce((sum, d) => sum + (d.lpo_value_incl_vat || 0), 0);
