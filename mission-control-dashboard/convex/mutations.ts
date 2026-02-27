@@ -811,9 +811,11 @@ export const syncBrandPerformance = mutation({
       throw new Error(`LPO ${po_number} not found`);
     }
     
-    const orderDate = new Date(lpo.order_date);
-    const year = orderDate.getFullYear();
-    const month = orderDate.getMonth() + 1;
+    // Use DELIVERY DATE for year and month (not order date)
+    const deliveryDateStr = lpo.delivery_date || lpo.order_date;
+    const deliveryDate = new Date(deliveryDateStr);
+    const year = deliveryDate.getFullYear();
+    const month = deliveryDate.getMonth() + 1;
     const commissionPct = lpo.commission_pct || 0;
     
     // Delete existing records for this PO
@@ -840,7 +842,7 @@ export const syncBrandPerformance = mutation({
         year,
         month,
         po_number,
-        po_date: lpo.order_date,
+        po_date: lpo.delivery_date || lpo.order_date,
         customer: lpo.customer,
         brand: lpo.brand,
         client: lpo.client,

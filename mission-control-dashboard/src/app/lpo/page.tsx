@@ -144,32 +144,31 @@ export default function LpoPage() {
       
       console.log("Header saved, updating line items...");
       
-      // Update each line item
+      // Update each line item - include ALL items (even 0 qty delivered)
       const lineItemsToSync = [];
       for (const item of editLineItems) {
-        if (item.quantity_delivered && Number(item.quantity_delivered) > 0) {
-          console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced, item.vat_amount_invoiced, item.total_incl_vat_invoiced);
-          await updateLpoLineItem({
-            lineItemId: item._id,
-            quantity_delivered: Number(item.quantity_delivered),
-            amount_invoiced: Number(item.amount_invoiced),
-            vat_amount_invoiced: Number(item.vat_amount_invoiced),
-            total_incl_vat_invoiced: Number(item.total_incl_vat_invoiced),
-          });
-          
-          // Collect for brand performance sync
-          lineItemsToSync.push({
-            barcode: item.barcode,
-            product_name: item.product_name,
-            quantity_ordered: item.quantity_ordered,
-            quantity_delivered: item.quantity_delivered,
-            unit_cost: item.unit_cost,
-            amount_incl_vat: item.amount_incl_vat,
-            amount_invoiced: item.amount_invoiced || 0,
-            vat_amount_invoiced: item.vat_amount_invoiced || 0,
-            total_incl_vat_invoiced: item.total_incl_vat_invoiced || 0,
-          });
-        }
+        // Update line item in database
+        console.log("Updating item:", item._id, item.quantity_delivered, item.amount_invoiced, item.vat_amount_invoiced, item.total_incl_vat_invoiced);
+        await updateLpoLineItem({
+          lineItemId: item._id,
+          quantity_delivered: Number(item.quantity_delivered) || 0,
+          amount_invoiced: Number(item.amount_invoiced) || 0,
+          vat_amount_invoiced: Number(item.vat_amount_invoiced) || 0,
+          total_incl_vat_invoiced: Number(item.total_incl_vat_invoiced) || 0,
+        });
+        
+        // Collect ALL for brand performance sync (including 0 qty delivered)
+        lineItemsToSync.push({
+          barcode: item.barcode,
+          product_name: item.product_name,
+          quantity_ordered: item.quantity_ordered,
+          quantity_delivered: Number(item.quantity_delivered) || 0,
+          unit_cost: item.unit_cost,
+          amount_incl_vat: item.amount_incl_vat,
+          amount_invoiced: item.amount_invoiced || 0,
+          vat_amount_invoiced: item.vat_amount_invoiced || 0,
+          total_incl_vat_invoiced: item.total_incl_vat_invoiced || 0,
+        });
       }
       
       // Sync to Brand Performance (only if user clicks sync button)
