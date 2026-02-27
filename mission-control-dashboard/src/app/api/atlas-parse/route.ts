@@ -36,41 +36,51 @@ async function parseWithGPT(images: string[], type: string): Promise<any> {
   let userPrompt = "";
 
   if (type === "lpo") {
-    userPrompt = `You are an expert at parsing LPO (Local Purchase Order) documents from UAE/Talabat. 
+    userPrompt = `You are an expert at parsing Talabat LPO documents.
 
-CRITICAL INSTRUCTIONS:
-1. Read EVERY line item in the table carefully
-2. Product names are typically in Arabic/English
-3. Barcodes are usually 13-digit numbers
-4. Quantities are numbers (not words)
-5. Prices are in AED (Dirhams)
+TABLE COLUMN STRUCTURE - READ IN THIS ORDER:
+Column 1: No. (row number)
+Column 2: SKU (internal SKU code like 913327)
+Column 3: Barcode (13-digit like 09501033112124)  
+Column 4: Product Name
+Column 5: Qty (QUANTITY - the number of units like 1554, 1050, 252)
+Column 6: Unit Cost (price per single unit like 74.00, 50.00)
+Column 7: Disc. Cost
+Column 8: Amt. Excl. VAT (Qty × Unit Cost)
+Column 9: VAT % (usually 5)
+Column 10: VAT Amt (Amt Excl VAT × 0.05)
+Column 11: Amt. Incl. VAT
 
-Extract the following fields EXACTLY as shown in the document:
+CRITICAL: The Qty column contains LARGE numbers like 1554, 1050, 252, 443, 322. 
+The Unit Cost column contains SMALL numbers like 74, 50, 12, 21, 15.
+DO NOT confuse these columns!
+
+Extract exactly:
 {
-  "po_number": "The purchase order number - copy exactly",
-  "order_date": "Date format YYYY-MM-DD",
-  "delivery_date": "Delivery date YYYY-MM-DD",  
-  "supplier": "Supplier name - copy exactly",
-  "delivery_location": "Delivery location - copy exactly",
-  "customer": "Customer name",
-  "total_excl_vat": Subtotal in AED (numbers only),
-  "total_vat": VAT amount in AED (numbers only),
-  "total_incl_vat": Grand total in AED (numbers only),
+  "po_number": "PO number exactly",
+  "order_date": "YYYY-MM-DD",
+  "delivery_date": "YYYY-MM-DD",
+  "supplier": "Supplier name exactly",
+  "delivery_location": "Delivery location exactly", 
+  "customer": "Talabat",
+  "total_excl_vat": Number (subtotal before VAT),
+  "total_vat": Number (VAT amount),
+  "total_incl_vat": Number (grand total),
   "line_items": [
     {
-      "barcode": "Barcode/SKU - copy exactly (13 digits typically)",
-      "product_name": "Product name - copy exactly",
-      "quantity_ordered": Quantity - number only,
-      "unit_cost": Unit price - number only,
-      "amount_excl_vat": Line total excl VAT - number only,
-      "vat_pct": VAT % (usually 5),
-      "vat_amount": VAT for this line - number only,
-      "amount_incl_vat": Line total incl VAT - number only
+      "barcode": "13-digit barcode exactly",
+      "product_name": "Full product name exactly",
+      "quantity_ordered": LARGE number from Qty column,
+      "unit_cost": SMALL number from Unit Cost column,
+      "amount_excl_vat": Number from Amt. Excl. VAT column,
+      "vat_pct": 5,
+      "vat_amount": Number from VAT Amt column,
+      "amount_incl_vat": Number from Amt. Incl. VAT column
     }
   ]
 }
 
-Return ONLY valid JSON array. Read each row carefully and accurately!`;
+Return ONLY valid JSON.`;
 
   } else if (type === "invoice") {
     userPrompt = `You are an expert at parsing Invoice documents from UAE. 
