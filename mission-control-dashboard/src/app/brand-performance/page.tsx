@@ -57,7 +57,7 @@ export default function BrandPerformancePage() {
     client: "",
     brand: "",
     customer: "",
-    year: new Date().getFullYear().toString(),
+    year: "", // Show all years by default
     month: "",
   });
   

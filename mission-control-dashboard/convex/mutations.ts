@@ -764,6 +764,8 @@ export const updateLpoLineItem = mutation({
     amount_invoiced: v.optional(v.number()),
     vat_amount_invoiced: v.optional(v.number()),
     total_incl_vat_invoiced: v.optional(v.number()),
+    invoice_number: v.optional(v.string()),
+    invoice_date: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const updateData: any = {};
@@ -771,6 +773,8 @@ export const updateLpoLineItem = mutation({
     if (args.amount_invoiced !== undefined) updateData.amount_invoiced = args.amount_invoiced;
     if (args.vat_amount_invoiced !== undefined) updateData.vat_amount_invoiced = args.vat_amount_invoiced;
     if (args.total_incl_vat_invoiced !== undefined) updateData.total_incl_vat_invoiced = args.total_incl_vat_invoiced;
+    if (args.invoice_number !== undefined) updateData.invoice_number = args.invoice_number;
+    if (args.invoice_date !== undefined) updateData.invoice_date = args.invoice_date;
     
     // Handle both string and Id types
     const lineItemId = typeof args.lineItemId === 'string' ? args.lineItemId as any : args.lineItemId;

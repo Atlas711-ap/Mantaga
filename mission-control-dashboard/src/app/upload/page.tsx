@@ -15,7 +15,8 @@ import {
   useInsertInvoiceTable,
   useInsertInvoiceLineItems,
   useInsertBrandPerformance,
-  useInsertMessage
+  useInsertMessage,
+  useMasterSku
 } from "../../hooks/useConvex";
 
 type UploadType = "daily_stock" | "sku_list" | "lpo" | "invoice";
@@ -72,6 +73,16 @@ export default function DataUploadPage() {
   const insertInvoiceLineItem = useInsertInvoiceLineItems();
   const insertBrandPerf = useInsertBrandPerformance();
   const insertChatMessage = useInsertMessage();
+  
+  // Get master SKU for brand/client lookup
+  const masterSkuData = useMasterSku();
+  const masterSkuList = masterSkuData || [];
+  
+  // Create barcode -> {brand, client} map for fast lookup
+  const skuMap = new Map();
+  for (const sku of masterSkuList) {
+    skuMap.set(sku.barcode, { brand: sku.brand, client: sku.client });
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -658,6 +669,11 @@ Status: ⏳ Awaiting invoice match`,
               const unitCost = parseFloat(row.unit_cost || row["unit_cost"] || "0");
               const vatPct = 5;
 
+              // Look up brand and client from master SKU
+              const skuInfo = skuMap.get(barcode) || {};
+              const brand = skuInfo.brand || "";
+              const client = skuInfo.client || "";
+
               if (barcode && productName && quantity > 0) {
                 // Calculate ordered amount (qty x unit cost x 1.05 for VAT)
                 const orderedAmtExclVat = quantity * unitCost;
@@ -668,6 +684,8 @@ Status: ⏳ Awaiting invoice match`,
                   po_number: poNumber,
                   barcode: barcode,
                   product_name: productName,
+                  brand: brand,
+                  client: client,
                   quantity_ordered: quantity,
                   quantity_delivered: 0, // Will be entered manually later
                   unit_cost: unitCost,

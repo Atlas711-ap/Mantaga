@@ -155,6 +155,8 @@ export default function LpoPage() {
           amount_invoiced: Number(item.amount_invoiced) || 0,
           vat_amount_invoiced: Number(item.vat_amount_invoiced) || 0,
           total_incl_vat_invoiced: Number(item.total_incl_vat_invoiced) || 0,
+          invoice_number: editForm.invoice_number || "",
+          invoice_date: editForm.invoice_date || "",
         });
         
         // Collect ALL for brand performance sync (including 0 qty delivered)
