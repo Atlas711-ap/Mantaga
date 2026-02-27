@@ -211,9 +211,10 @@ export const getBrandPerformance = query({
       if (!lpo) continue;
       
       // Parse order_date to get year and month
-      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
-      const year = orderDate.getFullYear();
-      const month = orderDate.getMonth() + 1;
+      // Use invoice_date for year and month (when the sale actually happened)
+      const invoiceDate = item.invoice_date ? new Date(item.invoice_date) : new Date();
+      const year = invoiceDate.getFullYear();
+      const month = invoiceDate.getMonth() + 1;
       
       const qtyOrdered = item.quantity_ordered || 0;
       const qtyDelivered = item.quantity_delivered || 0;
@@ -279,9 +280,9 @@ export const getBrandPerformanceByYearMonth = query({
       if (!lpo) continue;
       
       // Parse order_date to get year and month
-      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
-      const itemYear = orderDate.getFullYear();
-      const itemMonth = orderDate.getMonth() + 1;
+      const invoiceDate = item.invoice_date ? new Date(item.invoice_date) : new Date();
+      const itemYear = invoiceDate.getFullYear();
+      const itemMonth = invoiceDate.getMonth() + 1;
       
       // Filter by requested year/month
       if (itemYear !== args.year || itemMonth !== args.month) continue;
@@ -355,9 +356,9 @@ export const getBrandPerformanceWithFilters = query({
       if (!lpo) continue;
       
       // Parse order_date to get year and month
-      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
-      const itemYear = orderDate.getFullYear();
-      const itemMonth = orderDate.getMonth() + 1;
+      const invoiceDate = item.invoice_date ? new Date(item.invoice_date) : new Date();
+      const itemYear = invoiceDate.getFullYear();
+      const itemMonth = invoiceDate.getMonth() + 1;
       
       // Apply filters
       if (args.year && itemYear !== args.year) continue;
@@ -431,9 +432,9 @@ export const getBrandPerformanceMTD = query({
       const lpo = lpoMap.get(item.po_number);
       if (!lpo) continue;
       
-      const orderDate = lpo.order_date ? new Date(lpo.order_date) : new Date();
-      const itemYear = orderDate.getFullYear();
-      const itemMonth = orderDate.getMonth() + 1;
+      const invoiceDate = item.invoice_date ? new Date(item.invoice_date) : new Date();
+      const itemYear = invoiceDate.getFullYear();
+      const itemMonth = invoiceDate.getMonth() + 1;
       
       if (itemYear === targetYear && itemMonth === targetMonth) {
         results.push({

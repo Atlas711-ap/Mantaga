@@ -90,12 +90,13 @@ export default function BrandPerformancePage() {
   }, [filteredData]);
 
   const mtdStats = useMemo(() => {
+    const totalLpoValue = mtdData.reduce((sum, d) => sum + (d.lpo_value_incl_vat || 0), 0);
     const totalInvoiced = mtdData.reduce((sum, d) => sum + (d.invoiced_value_incl_vat || 0), 0);
     const totalCommission = mtdData.reduce((sum, d) => sum + d.commission_aed, 0);
     const lpoCount = new Set(mtdData.map(d => d.po_number)).size;
     const skuCount = mtdData.length;
-    const avgService = skuCount > 0 ? mtdData.reduce((sum, d) => sum + d.service_level_pct, 0) / skuCount : 0;
-    return { totalInvoiced, totalCommission, lpoCount, skuCount, avgService };
+    const serviceLevel = totalLpoValue > 0 ? (totalInvoiced / totalLpoValue) * 100 : 0;
+    return { totalLpoValue, totalInvoiced, totalCommission, lpoCount, skuCount, serviceLevel };
   }, [mtdData]);
 
   // YTD calculations
@@ -104,22 +105,24 @@ export default function BrandPerformancePage() {
   }, [filteredData, currentYear]);
 
   const ytdStats = useMemo(() => {
+    const totalLpoValue = ytdData.reduce((sum, d) => sum + (d.lpo_value_incl_vat || 0), 0);
     const totalInvoiced = ytdData.reduce((sum, d) => sum + (d.invoiced_value_incl_vat || 0), 0);
     const totalCommission = ytdData.reduce((sum, d) => sum + d.commission_aed, 0);
     const lpoCount = new Set(ytdData.map(d => d.po_number)).size;
     const skuCount = ytdData.length;
-    const avgService = skuCount > 0 ? ytdData.reduce((sum, d) => sum + d.service_level_pct, 0) / skuCount : 0;
-    return { totalInvoiced, totalCommission, lpoCount, skuCount, avgService };
+    const serviceLevel = totalLpoValue > 0 ? (totalInvoiced / totalLpoValue) * 100 : 0;
+    return { totalLpoValue, totalInvoiced, totalCommission, lpoCount, skuCount, serviceLevel };
   }, [ytdData]);
 
   // Filtered totals
   const filteredStats = useMemo(() => {
+    const totalLpoValue = filteredData.reduce((sum, d) => sum + (d.lpo_value_incl_vat || 0), 0);
     const totalInvoiced = filteredData.reduce((sum, d) => sum + (d.invoiced_value_incl_vat || 0), 0);
     const totalCommission = filteredData.reduce((sum, d) => sum + d.commission_aed, 0);
     const lpoCount = new Set(filteredData.map(d => d.po_number)).size;
     const skuCount = filteredData.length;
-    const avgService = skuCount > 0 ? filteredData.reduce((sum, d) => sum + d.service_level_pct, 0) / skuCount : 0;
-    return { totalInvoiced, totalCommission, lpoCount, skuCount, avgService };
+    const serviceLevel = totalLpoValue > 0 ? (totalInvoiced / totalLpoValue) * 100 : 0;
+    return { totalLpoValue, totalInvoiced, totalCommission, lpoCount, skuCount, serviceLevel };
   }, [filteredData]);
 
   // Monthly history (from filtered data)
@@ -273,7 +276,11 @@ export default function BrandPerformancePage() {
       {/* Filtered Results Summary */}
       <div>
         <div className="text-xs font-medium text-gray-500 mb-3">Filtered Results ({filteredStats.skuCount} SKUs, {filteredStats.lpoCount} LPOs)</div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+            <div className="text-xs text-gray-500 mb-1">Total LPO Value</div>
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(filteredStats.totalLpoValue)}</div>
+          </div>
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="text-xs text-gray-500 mb-1">Total Invoiced</div>
             <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(filteredStats.totalInvoiced)}</div>
@@ -283,24 +290,20 @@ export default function BrandPerformancePage() {
             <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(filteredStats.totalCommission)}</div>
           </div>
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs text-gray-500 mb-1">LPOs</div>
-            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{filteredStats.lpoCount}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs text-gray-500 mb-1">SKUs</div>
-            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{filteredStats.skuCount}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="text-xs text-gray-500 mb-1">Service Level</div>
-            <div className={`text-2xl font-semibold ${getServiceColor(filteredStats.avgService)}`}>{filteredStats.avgService.toFixed(0)}%</div>
+            <div className={`text-2xl font-semibold ${getServiceColor(filteredStats.serviceLevel)}`}>{filteredStats.serviceLevel.toFixed(1)}%</div>
           </div>
         </div>
       </div>
 
       {/* MTD Summary Cards */}
       <div>
-        <div className="text-xs font-medium text-gray-500 mb-3">This Month ({monthNames[currentMonth]} {currentYear})</div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="text-xs font-medium text-gray-500 mb-3">Month to Date - {monthNames[currentMonth]} {currentYear}</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+            <div className="text-xs text-gray-500 mb-1">Total LPO Value</div>
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(mtdStats.totalLpoValue)}</div>
+          </div>
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="text-xs text-gray-500 mb-1">Total Invoiced</div>
             <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(mtdStats.totalInvoiced)}</div>
@@ -310,16 +313,8 @@ export default function BrandPerformancePage() {
             <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(mtdStats.totalCommission)}</div>
           </div>
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs text-gray-500 mb-1">LPOs</div>
-            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{mtdStats.lpoCount}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs text-gray-500 mb-1">SKUs</div>
-            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{mtdStats.skuCount}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="text-xs text-gray-500 mb-1">Service Level</div>
-            <div className={`text-2xl font-semibold ${getServiceColor(mtdStats.avgService)}`}>{mtdStats.avgService.toFixed(0)}%</div>
+            <div className={`text-2xl font-semibold ${getServiceColor(mtdStats.serviceLevel)}`}>{mtdStats.serviceLevel.toFixed(1)}%</div>
           </div>
         </div>
       </div>
@@ -327,7 +322,11 @@ export default function BrandPerformancePage() {
       {/* YTD Summary Cards */}
       <div>
         <div className="text-xs font-medium text-gray-500 mb-3">Year to Date ({currentYear})</div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+            <div className="text-xs text-gray-500 mb-1">Total LPO Value</div>
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(ytdStats.totalLpoValue)}</div>
+          </div>
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="text-xs text-gray-500 mb-1">Total Invoiced</div>
             <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(ytdStats.totalInvoiced)}</div>
@@ -337,16 +336,8 @@ export default function BrandPerformancePage() {
             <div className="text-2xl font-semibold text-gray-900 dark:text-white">{formatAED(ytdStats.totalCommission)}</div>
           </div>
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs text-gray-500 mb-1">LPOs</div>
-            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{ytdStats.lpoCount}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-            <div className="text-xs text-gray-500 mb-1">SKUs</div>
-            <div className="text-2xl font-semibold text-gray-900 dark:text-white">{ytdStats.skuCount}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
             <div className="text-xs text-gray-500 mb-1">Service Level</div>
-            <div className={`text-2xl font-semibold ${getServiceColor(ytdStats.avgService)}`}>{ytdStats.avgService.toFixed(0)}%</div>
+            <div className={`text-2xl font-semibold ${getServiceColor(ytdStats.serviceLevel)}`}>{ytdStats.serviceLevel.toFixed(1)}%</div>
           </div>
         </div>
       </div>
