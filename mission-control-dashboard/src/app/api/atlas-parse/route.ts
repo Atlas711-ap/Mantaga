@@ -38,32 +38,39 @@ async function parseWithGPT(images: string[], type: string): Promise<any> {
   if (type === "lpo") {
     userPrompt = `You are an expert at parsing LPO (Local Purchase Order) documents from UAE/Talabat. 
 
-Extract the following fields from this LPO document and return ONLY valid JSON:
+CRITICAL INSTRUCTIONS:
+1. Read EVERY line item in the table carefully
+2. Product names are typically in Arabic/English
+3. Barcodes are usually 13-digit numbers
+4. Quantities are numbers (not words)
+5. Prices are in AED (Dirhams)
+
+Extract the following fields EXACTLY as shown in the document:
 {
-  "po_number": "The purchase order number (e.g., LPO-2026-001234)",
-  "order_date": "Date the order was placed (YYYY-MM-DD format)",
-  "delivery_date": "Expected delivery date (YYYY-MM-DD format)",  
-  "supplier": "The supplier/vendor name",
-  "delivery_location": "Where the order should be delivered (e.g., Talabat 3PL, Darkstore)",
-  "customer": "The customer or channel name (usually Talabat)",
-  "total_excl_vat": Total amount excluding VAT (AED) - number only,
-  "total_vat": VAT amount (AED) - number only,
-  "total_incl_vat": Total amount including VAT (AED) - number only,
+  "po_number": "The purchase order number - copy exactly",
+  "order_date": "Date format YYYY-MM-DD",
+  "delivery_date": "Delivery date YYYY-MM-DD",  
+  "supplier": "Supplier name - copy exactly",
+  "delivery_location": "Delivery location - copy exactly",
+  "customer": "Customer name",
+  "total_excl_vat": Subtotal in AED (numbers only),
+  "total_vat": VAT amount in AED (numbers only),
+  "total_incl_vat": Grand total in AED (numbers only),
   "line_items": [
     {
-      "barcode": "Product barcode/SKU",
-      "product_name": "Product name",
-      "quantity_ordered": quantity - number,
-      "unit_cost": Cost per unit (AED) - number,
-      "amount_excl_vat": Line total excluding VAT - number,
-      "vat_pct": VAT percentage (usually 5),
-      "vat_amount": VAT amount for this line - number,
-      "amount_incl_vat": Line total including VAT - number
+      "barcode": "Barcode/SKU - copy exactly (13 digits typically)",
+      "product_name": "Product name - copy exactly",
+      "quantity_ordered": Quantity - number only,
+      "unit_cost": Unit price - number only,
+      "amount_excl_vat": Line total excl VAT - number only,
+      "vat_pct": VAT % (usually 5),
+      "vat_amount": VAT for this line - number only,
+      "amount_incl_vat": Line total incl VAT - number only
     }
   ]
 }
 
-Return ONLY JSON, no markdown. If a field cannot be determined, use null.`;
+Return ONLY valid JSON array. Read each row carefully and accurately!`;
 
   } else if (type === "invoice") {
     userPrompt = `You are an expert at parsing Invoice documents from UAE. 

@@ -150,11 +150,11 @@ export default function DataUploadPage() {
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     const images: string[] = [];
     
-    const numPages = Math.min(pdf.numPages, maxPages);
+    const numPages = Math.min(pdf.numPages, 1); // Only first page for accuracy
     
     for (let i = 1; i <= numPages; i++) {
       const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 1.5 });
+      const viewport = page.getViewport({ scale: 2.5 });
       
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
